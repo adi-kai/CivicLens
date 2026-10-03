@@ -13,8 +13,8 @@ from civiclens.data.openstates import get_state_reps_by_chamber
 from civiclens.data.tiger import (LAYER_STATE_HOUSE, LAYER_STATE_SENATE, LAYER_US_HOUSE,
                                   US_STATES_GEOJSON_URL, extract_district_key,
                                   fetch_tiger_geojson)
-from civiclens.helpers import (build_rep_lookup, esc, get_chamber_label, html_block, party_color,
-                               party_fill, show_searched_address)
+from civiclens.helpers import (address_input, build_rep_lookup, esc, get_chamber_label,
+                               html_block, party_color, party_fill, show_searched_address)
 from civiclens.states import DEFAULT_STATE, STATES
 
 def build_district_layer(geojson: dict, rep_lookup: dict, layer_name: str,
@@ -68,7 +68,7 @@ def render():
 
     col_addr, col_state = st.columns([3, 1])
     with col_addr:
-        address = st.text_input("Enter your address (optional — pins your location and auto-selects the state below)")
+        address = address_input("Enter your address (optional — pins your location and auto-selects the state below)")
     with col_state:
         state_abbrs = sorted(STATES.keys())
         manual_state = st.selectbox(

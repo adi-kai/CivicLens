@@ -4,8 +4,8 @@ import streamlit as st
 from civiclens.data.geocode import geocode
 from civiclens.data.governors import get_governor, governor_links_html
 from civiclens.data.openstates import get_reps_by_location
-from civiclens.helpers import (esc, get_chamber_label, html_block, is_federal, is_state,
-                               party_badge, party_css, show_searched_address)
+from civiclens.helpers import (address_input, esc, get_chamber_label, html_block, is_federal,
+                               is_state, party_badge, party_css, show_searched_address)
 from civiclens.states import LOWER_CHAMBER_NAMES, STATES
 
 
@@ -15,8 +15,12 @@ def rep_card(name: str, party: str, label: str, photo: str = "", contact_html: s
     css, badge = party_css(party), party_badge(party)
     col1, col2 = st.columns([1, 5])
     with col1:
-        if photo: st.image(photo, width=75)
-        else: st.markdown("👤")
+        # Plain <img> rather than st.image, which has no way to set alt text for screen readers
+        if photo:
+            st.markdown(f"<img src='{esc(photo)}' alt='Photo of {esc(name)}' width='75' "
+                        f"style='max-width:100%;border-radius:6px'/>", unsafe_allow_html=True)
+        else:
+            st.markdown("👤")
     with col2:
         st.markdown(html_block(f"""
         <div class="rep-card {css}">
@@ -46,7 +50,7 @@ def by_chamber(reps: list, chamber: str) -> list:
 def render():
     st.header("🏛️ Who Represents You?")
     st.caption("Shows your state legislators AND your federal representatives in Congress — for any U.S. address.")
-    address = st.text_input("Enter your address", placeholder="123 Main St, Charlotte, NC 28201")
+    address = address_input("Enter your address")
 
     if st.button("Find My Reps", type="primary"):
         if not address.strip():

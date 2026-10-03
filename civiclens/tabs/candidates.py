@@ -2,7 +2,7 @@
 import streamlit as st
 
 from civiclens.data.ai import candidate_info_fallback, get_candidate_info
-from civiclens.helpers import html_block, rate_limit_check
+from civiclens.helpers import html_block, rate_limit_check, sanitize_ai_html
 from civiclens.states import DEFAULT_STATE, STATES, get_candidate_races
 from civiclens.theme import theme_ai_html
 
@@ -45,7 +45,7 @@ def render():
                         st.toast("⚡ Gemini unavailable, switching to backup…", icon="🔄")
                         html_output = candidate_info_fallback(clean_race, cand_state_name)
 
-            st.markdown(html_block(theme_ai_html(html_output)), unsafe_allow_html=True)
+            st.markdown(html_block(theme_ai_html(sanitize_ai_html(html_output))), unsafe_allow_html=True)
             if cand_state == "NC":
                 verify_link = "[ncsbe.gov](https://www.ncsbe.gov)"
             else:

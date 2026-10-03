@@ -26,7 +26,8 @@ def os_person(name, party, title, org, district, jur_class, jur_name, pid):
             "jurisdiction": {"classification": jur_class, "name": jur_name}}
 
 GEO_REPS = [
-    os_person("Sen One", "Republican", "Senator", "upper", "North Carolina", "country", "United States", "f1"),
+    dict(os_person("Sen One", "Republican", "Senator", "upper", "North Carolina", "country", "United States", "f1"),
+         image="https://example.com/sen-one.jpg"),
     os_person("Rep House", "Democratic", "Representative", "lower", "12", "country", "United States", "f2"),
     os_person("State Sen", "Democratic", "Senator", "upper", "37", "state", "North Carolina", "s1"),
     os_person("State Rep", "Republican", "Representative", "lower", "99", "state", "North Carolina", "s2"),
@@ -70,7 +71,9 @@ BILLS = {"results": [{
                                  "current_role": {"title": "Senator"}}}],
 }]}
 
-CANDIDATE_HTML = "<div><h4>Candidate A</h4>\n\n    <p>Positions</p></div>"
+# Includes markup the sanitizer must strip, as if it came from a hostile search result
+CANDIDATE_HTML = ('<div><h4 onclick="steal()">Candidate A</h4>\n\n    <p>Positions</p>'
+                  '<script>steal()</script><a href="javascript:steal()">site</a></div>')
 
 
 class FakeResponse:
@@ -187,14 +190,24 @@ def polling(at):
 
 def deadlines(at):
     go(at, "📅 Deadlines")
-    at.text_input(key="dl_address").input(ADDR).run()
+    at.text_input(key="address").input(ADDR).run()
     return ["Voter Registration Deadline", "Absentee Ballot Return Deadline"]
 
 def my_reps(at):
     go(at, "🏛️ My Representatives")
     at.text_input[0].input(ADDR)
     button(at, "Find My Reps").click().run()
-    return ["Gov Person", "Sen One", "Rep House", "State Senator — District 37", "State Rep"]
+    return ["Gov Person", "Sen One", "Rep House", "State Senator — District 37", "State Rep",
+            "alt='Photo of Sen One'"]
+
+def shared_address(at):
+    # Typed once in Polling Finder, still there in My Representatives — even after Home,
+    # which has no address box and so makes Streamlit drop the widget's own state
+    go(at, "📍 Polling Finder")
+    at.text_input(key="address").input(ADDR).run()
+    go(at, "🏠 Home")
+    go(at, "🏛️ My Representatives")
+    return [f"TextInput: {ADDR}"]
 
 def rep_map(at):
     go(at, "🗺️ Rep Map")
@@ -211,7 +224,7 @@ def bills(at):
 
 def compare(at):
     go(at, "🔍 District Compare")
-    at.text_input(key="dc_addr1").input(ADDR)
+    at.text_input(key="address").input(ADDR)
     at.text_input(key="dc_addr2").input("1 Other St, Raleigh, NC 27601")
     button(at, "Compare Districts").click().run()
     return ["North Carolina State Senator — District 37", "share **4**"]
@@ -221,13 +234,14 @@ def candidates(at):
     at.selectbox(key="cand_state").set_value("NC").run()
     next(s for s in at.selectbox if s.label == "Select Race").set_value("U.S. Senate").run()
     button(at, "Find Candidates & Positions").click().run()
-    return ["Candidate A", "ncsbe.gov"]
+    return ["Candidate A", "ncsbe.gov"], ["<script", "onclick", "javascript:"]
 
 def theme(at):
     at.sidebar.selectbox[0].set_value("midnight").run()
     return ["--cl-paper: #15112B"]
 
-SECTIONS = [home, polling, deadlines, my_reps, rep_map, bills, compare, candidates, theme]
+SECTIONS = [home, polling, deadlines, my_reps, shared_address, rep_map, bills, compare,
+            candidates, theme]
 
 
 def main():
@@ -242,7 +256,9 @@ def main():
             failures.append(f"{section.__name__}: app failed to start — {at.exception[0].value}")
             continue
         try:
-            expected = section(at)
+            # A section returns the text that must appear, optionally with text that must not
+            result = section(at)
+            expected, forbidden = result if isinstance(result, tuple) else (result, [])
         except Exception as e:
             failures.append(f"{section.__name__}: test step failed — {e!r}")
             continue
@@ -250,6 +266,7 @@ def main():
         text = "\n".join(out)
         problems = [f"exception: {ex.value}" for ex in at.exception]
         problems += [f"missing {s!r}" for s in expected if s not in text]
+        problems += [f"should not contain {s!r}" for s in forbidden if s in text]
         for p in problems:
             failures.append(f"{section.__name__}: {p}")
         print(f"{'FAIL' if problems else 'ok  '} {section.__name__}")

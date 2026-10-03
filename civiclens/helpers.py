@@ -60,6 +60,35 @@ def html_block(markup: str) -> str:
     no subject tags) or indented AI output would show up as raw HTML text."""
     return "\n".join(line.strip() for line in str(markup).splitlines() if line.strip())
 
+ADDRESS_KEY = "address"
+_SAVED_ADDRESS_KEY = "_saved_address"
+
+def _save_address():
+    st.session_state[_SAVED_ADDRESS_KEY] = st.session_state[ADDRESS_KEY]
+
+def address_input(label: str, placeholder: str = "123 Main St, Charlotte, NC 28201",
+                  help: str = None) -> str:
+    """The address box every section shares, so an address typed once carries over when
+    you switch sections. Streamlit forgets a widget's value on any run where it isn't
+    drawn (e.g. a visit to Home), so the value is also kept under a plain session key
+    and restored here before the widget is created."""
+    st.session_state[ADDRESS_KEY] = st.session_state.get(_SAVED_ADDRESS_KEY, "")
+    return st.text_input(label, key=ADDRESS_KEY, placeholder=placeholder, help=help,
+                         on_change=_save_address)
+
+def sanitize_ai_html(markup: str) -> str:
+    """AI candidate cards are rendered as HTML, and the model's input includes web search
+    results we don't control. Keep the formatting tags, but drop anything that could run
+    code or load other pages: script-like tags, on* event attributes, and javascript: links."""
+    markup = str(markup or "")
+    markup = re.sub(r"(?is)<(script|style|iframe|object|embed|form)\b.*?</\1\s*>", "", markup)
+    markup = re.sub(r"(?is)</?(script|style|iframe|object|embed|form|input|button|link|meta|base)\b[^>]*>", "", markup)
+
+    def clean_tag(m):
+        tag = re.sub(r"""(?is)\s+on\w+\s*=\s*(".*?"|'.*?'|[^\s>]+)""", "", m.group(0))
+        return re.sub(r"""(?is)\b(href|src)\s*=\s*(["']?)\s*javascript:[^"'>]*\2""", r'\1="#"', tag)
+    return re.sub(r"<[^<>]+>", clean_tag, markup)
+
 def show_searched_address(address: str):
     """Prints the address actually being used, right above whatever results follow."""
     if address and address.strip():

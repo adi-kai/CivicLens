@@ -3,8 +3,8 @@ import streamlit as st
 
 from civiclens.data.geocode import geocode
 from civiclens.data.openstates import get_reps_by_location
-from civiclens.helpers import (esc, get_chamber_label, html_block, is_federal, is_state,
-                               party_badge, party_css)
+from civiclens.helpers import (address_input, esc, get_chamber_label, html_block, is_federal,
+                               is_state, party_badge, party_css)
 from civiclens.states import STATES
 
 
@@ -14,7 +14,7 @@ def render():
 
     col1, col2 = st.columns(2)
     with col1:
-        addr1 = st.text_input("📍 Address 1", placeholder="123 Main St, Charlotte, NC 28201", key="dc_addr1")
+        addr1 = address_input("📍 Address 1")
     with col2:
         addr2 = st.text_input("📍 Address 2", placeholder="100 Congress Ave, Austin, TX 78701", key="dc_addr2")
 

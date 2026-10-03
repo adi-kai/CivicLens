@@ -61,7 +61,8 @@ def apply_base_styles():
         margin-bottom: 1rem;
         border: 1px solid var(--cl-border, #e0e0e0);
         display: flex;
-        gap: 1.5rem;
+        flex-wrap: wrap;
+        gap: 0.5rem 1.5rem;
         align-items: center;
     }
     .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; }

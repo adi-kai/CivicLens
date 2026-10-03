@@ -3,7 +3,7 @@ import streamlit as st
 
 from civiclens.data.civic import get_official_resources
 from civiclens.data.geocode import geocode
-from civiclens.helpers import show_searched_address
+from civiclens.helpers import address_input, show_searched_address
 from civiclens.states import STATES
 
 
@@ -12,7 +12,7 @@ def render():
     st.caption("Election Day itself is set federally — the same date nationwide. "
                "Registration and early-voting windows are set by each state, so enter your address below to see yours.")
 
-    dl_address = st.text_input("Enter your address", key="dl_address")
+    dl_address = address_input("Enter your address")
 
     dl_state = None
     if dl_address.strip():

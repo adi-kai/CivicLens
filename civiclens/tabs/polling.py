@@ -3,14 +3,14 @@ import streamlit as st
 
 from civiclens.data.civic import get_official_resources, get_voter_info
 from civiclens.data.geocode import geocode
-from civiclens.helpers import esc, show_searched_address
+from civiclens.helpers import address_input, esc, show_searched_address
 from civiclens.states import STATES
 
 
 def render():
     st.header("📍 Find Your Polling Place")
     st.caption("Works for any U.S. address — powered by the Google Civic Information API.")
-    address = st.text_input("Enter your full address (e.g. 123 Main St, Charlotte, NC 28201)")
+    address = address_input("Enter your full address")
 
     if st.button("Search", type="primary"):
         if not address.strip():
