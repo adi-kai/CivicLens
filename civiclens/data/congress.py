@@ -76,10 +76,6 @@ def get_federal_house_members(state_abbr: str) -> list:
     except Exception:
         return []
 
-# Backwards-compatible alias
-def get_nc_federal_members() -> list:
-    return get_federal_house_members("NC")
-
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_federal_senators(state_abbr: str) -> list:
     """

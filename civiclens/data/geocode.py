@@ -4,10 +4,9 @@ import streamlit as st
 
 from civiclens.states import STATES, STATE_NAME_TO_ABBR
 
-# FIX #6 — Cache geocoding (24 hr TTL)
-# National update: now also auto-detects the state (USPS abbreviation) from the
-# geocoded address so every downstream fetcher (map, reps, bills) knows which
-# state to query without the user having to pick one manually.
+# Cached for 24 hours. Also detects the state (USPS abbreviation) from the geocoded
+# address so every downstream fetcher (map, reps, bills) knows which state to query
+# without the user having to pick one manually.
 @st.cache_data(ttl=86400, show_spinner=False)
 def geocode(address: str):
     """Returns (lat, lon, state_abbr). state_abbr is None if it can't be determined."""

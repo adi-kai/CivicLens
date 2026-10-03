@@ -4,9 +4,43 @@ import streamlit as st
 from civiclens.data.geocode import geocode
 from civiclens.data.governors import get_governor, governor_links_html
 from civiclens.data.openstates import get_reps_by_location
-from civiclens.helpers import (get_chamber_label, html_block, is_federal, is_state,
+from civiclens.helpers import (esc, get_chamber_label, html_block, is_federal, is_state,
                                party_badge, party_css, show_searched_address)
 from civiclens.states import LOWER_CHAMBER_NAMES, STATES
+
+
+def rep_card(name: str, party: str, label: str, photo: str = "", contact_html: str = ""):
+    """One representative: photo on the left, name/party/role card on the right.
+    contact_html is already-built (escaped) markup, or "" for none."""
+    css, badge = party_css(party), party_badge(party)
+    col1, col2 = st.columns([1, 5])
+    with col1:
+        if photo: st.image(photo, width=75)
+        else: st.markdown("👤")
+    with col2:
+        st.markdown(html_block(f"""
+        <div class="rep-card {css}">
+            <strong style="font-size:1.05rem">{esc(name)}</strong>
+            <span class="party-badge {badge}">{esc(party)}</span><br>
+            <span style="color:var(--cl-muted);font-size:0.88rem">{esc(label)}</span><br>
+            {contact_html}
+        </div>"""), unsafe_allow_html=True)
+
+
+def contact_form_link(url: str) -> str:
+    """Members of Congress list a contact-form URL rather than an email address."""
+    return f"📧 <a href='{esc(url)}' target='_blank'>Contact</a>" if url else ""
+
+
+def mailto_link(email: str) -> str:
+    """State legislators list an email address; skip it if it's actually a URL."""
+    if not email or email.startswith("http"):
+        return ""
+    return f"📧 <a href='mailto:{esc(email)}'>{esc(email)}</a>"
+
+
+def by_chamber(reps: list, chamber: str) -> list:
+    return [r for r in reps if (r.get("current_role") or {}).get("org_classification") == chamber]
 
 
 def render():
@@ -41,20 +75,9 @@ def render():
                     unsafe_allow_html=True,
                 )
                 if governor:
-                    gov_party = governor["party"]
-                    gov_css, gov_badge = party_css(gov_party), party_badge(gov_party)
-                    col1, col2 = st.columns([1, 5])
-                    with col1:
-                        if governor["photo"]: st.image(governor["photo"], width=75)
-                        else: st.markdown("👤")
-                    with col2:
-                        st.markdown(html_block(f"""
-                        <div class="rep-card {gov_css}">
-                            <strong style="font-size:1.05rem">{governor['name']}</strong>
-                            <span class="party-badge {gov_badge}">{gov_party}</span><br>
-                            <span style="color:var(--cl-muted);font-size:0.88rem">{governor['office']}{" — " + state_name if state_name else ""}</span><br>
-                            {governor_links_html(governor)}
-                        </div>"""), unsafe_allow_html=True)
+                    rep_card(governor["name"], governor["party"],
+                             f"{governor['office']}{' — ' + state_name if state_name else ''}",
+                             governor["photo"], governor_links_html(governor))
                 else:
                     st.caption(
                         f"Could not load the current {office_label.lower()} right now"
@@ -74,88 +97,25 @@ def render():
                     state_reps   = [r for r in all_reps if is_state(r)]
 
                     st.markdown(f'<p class="section-label">🇺🇸 U.S. Senate{" — " + state_name if state_name else ""}</p>', unsafe_allow_html=True)
-                    us_senators = [r for r in federal_reps if (r.get("current_role") or {}).get("org_classification") == "upper"]
-                    for rep in us_senators:
-                        name  = rep.get("name", "Unknown")
-                        party = rep.get("party", "Unknown")
-                        photo = rep.get("image", "")
-                        email = rep.get("email", "")
-                        css, badge = party_css(party), party_badge(party)
-                        col1, col2 = st.columns([1, 5])
-                        with col1:
-                            if photo: st.image(photo, width=75)
-                            else: st.markdown("👤")
-                        with col2:
-                            st.markdown(f"""
-                            <div class="rep-card {css}">
-                                <strong style="font-size:1.05rem">{name}</strong>
-                                <span class="party-badge {badge}">{party}</span><br>
-                                <span style="color:var(--cl-muted);font-size:0.88rem">U.S. Senator{" — " + state_name if state_name else ""}</span><br>
-                                {"📧 <a href='" + email + "' target='_blank'>Contact</a>" if email else ""}
-                            </div>""", unsafe_allow_html=True)
+                    for rep in by_chamber(federal_reps, "upper"):
+                        rep_card(rep.get("name", "Unknown"), rep.get("party", "Unknown"),
+                                 f"U.S. Senator{' — ' + state_name if state_name else ''}",
+                                 rep.get("image", ""), contact_form_link(rep.get("email", "")))
 
                     st.markdown('<p class="section-label">🇺🇸 U.S. House of Representatives</p>', unsafe_allow_html=True)
-                    us_house = [r for r in federal_reps if (r.get("current_role") or {}).get("org_classification") == "lower"]
-                    for rep in us_house:
-                        name  = rep.get("name", "Unknown")
-                        party = rep.get("party", "Unknown")
-                        label = get_chamber_label(rep)
-                        photo = rep.get("image", "")
-                        email = rep.get("email", "")
-                        css, badge = party_css(party), party_badge(party)
-                        col1, col2 = st.columns([1, 5])
-                        with col1:
-                            if photo: st.image(photo, width=75)
-                            else: st.markdown("👤")
-                        with col2:
-                            st.markdown(f"""
-                            <div class="rep-card {css}">
-                                <strong style="font-size:1.05rem">{name}</strong>
-                                <span class="party-badge {badge}">{party}</span><br>
-                                <span style="color:var(--cl-muted);font-size:0.88rem">{label}</span><br>
-                                {"📧 <a href='" + email + "' target='_blank'>Contact</a>" if email else ""}
-                            </div>""", unsafe_allow_html=True)
+                    for rep in by_chamber(federal_reps, "lower"):
+                        rep_card(rep.get("name", "Unknown"), rep.get("party", "Unknown"),
+                                 get_chamber_label(rep), rep.get("image", ""),
+                                 contact_form_link(rep.get("email", "")))
 
                     st.markdown(f'<p class="section-label">🏛️ {state_name + " " if state_name else ""}State Senate</p>', unsafe_allow_html=True)
-                    nc_senate = [r for r in state_reps if (r.get("current_role") or {}).get("org_classification") == "upper"]
-                    for rep in nc_senate:
-                        name  = rep.get("name", "Unknown")
-                        party = rep.get("party", "Unknown")
-                        label = get_chamber_label(rep)
-                        photo = rep.get("image", "")
-                        email = rep.get("email", "")
-                        css, badge = party_css(party), party_badge(party)
-                        col1, col2 = st.columns([1, 5])
-                        with col1:
-                            if photo: st.image(photo, width=75)
-                            else: st.markdown("👤")
-                        with col2:
-                            st.markdown(f"""
-                            <div class="rep-card {css}">
-                                <strong style="font-size:1.05rem">{name}</strong>
-                                <span class="party-badge {badge}">{party}</span><br>
-                                <span style="color:var(--cl-muted);font-size:0.88rem">{label}</span><br>
-                                {"📧 <a href='mailto:" + email + "'>" + email + "</a>" if email and not email.startswith("http") else ""}
-                            </div>""", unsafe_allow_html=True)
+                    for rep in by_chamber(state_reps, "upper"):
+                        rep_card(rep.get("name", "Unknown"), rep.get("party", "Unknown"),
+                                 get_chamber_label(rep), rep.get("image", ""),
+                                 mailto_link(rep.get("email", "")))
 
                     st.markdown(f'<p class="section-label">🏛️ {state_name + " " if state_name else ""}{LOWER_CHAMBER_NAMES.get(detected_state, "State House of Representatives")}</p>', unsafe_allow_html=True)
-                    nc_house = [r for r in state_reps if (r.get("current_role") or {}).get("org_classification") == "lower"]
-                    for rep in nc_house:
-                        name  = rep.get("name", "Unknown")
-                        party = rep.get("party", "Unknown")
-                        label = get_chamber_label(rep)
-                        photo = rep.get("image", "")
-                        email = rep.get("email", "")
-                        css, badge = party_css(party), party_badge(party)
-                        col1, col2 = st.columns([1, 5])
-                        with col1:
-                            if photo: st.image(photo, width=75)
-                            else: st.markdown("👤")
-                        with col2:
-                            st.markdown(f"""
-                            <div class="rep-card {css}">
-                                <strong style="font-size:1.05rem">{name}</strong>
-                                <span class="party-badge {badge}">{party}</span><br>
-                                <span style="color:var(--cl-muted);font-size:0.88rem">{label}</span><br>
-                                {"📧 <a href='mailto:" + email + "'>" + email + "</a>" if email and not email.startswith("http") else ""}
-                            </div>""", unsafe_allow_html=True)
+                    for rep in by_chamber(state_reps, "lower"):
+                        rep_card(rep.get("name", "Unknown"), rep.get("party", "Unknown"),
+                                 get_chamber_label(rep), rep.get("image", ""),
+                                 mailto_link(rep.get("email", "")))

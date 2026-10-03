@@ -73,7 +73,7 @@ def apply_base_styles():
         border-radius: 12px;
         font-size: 0.72rem;
         background: #e9ecef;
-        color: #495057;              /* already had color, this one was fine */
+        color: #495057;
         margin-right: 4px;
         margin-top: 4px;
     }

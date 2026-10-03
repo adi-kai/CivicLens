@@ -5,6 +5,7 @@ import time
 import requests
 import streamlit as st
 
+from civiclens.helpers import esc
 from civiclens.states import STATE_NAME_TO_ABBR
 
 # ── Governor / head of state government (all 50 states + DC) ──────────────────
@@ -149,7 +150,7 @@ def governor_links_html(gov: dict) -> str:
     links = []
     if gov.get("site"):
         host = re.sub(r"^https?://(www\.)?", "", gov["site"]).rstrip("/")
-        links.append(f"🌐 <a href='{gov['site']}' target='_blank'>{host}</a>")
+        links.append(f"🌐 <a href='{esc(gov['site'])}' target='_blank'>{esc(host)}</a>")
     if gov.get("wikipedia"):
-        links.append(f"<a href='{gov['wikipedia']}' target='_blank'>Wikipedia</a>")
+        links.append(f"<a href='{esc(gov['wikipedia'])}' target='_blank'>Wikipedia</a>")
     return " &nbsp;·&nbsp; ".join(links)

@@ -1,7 +1,7 @@
 """Candidates: AI-assisted 2026 candidate research for a race."""
 import streamlit as st
 
-from civiclens.data.ai import _candidate_info_fallback, get_candidate_info
+from civiclens.data.ai import candidate_info_fallback, get_candidate_info
 from civiclens.helpers import html_block, rate_limit_check
 from civiclens.states import DEFAULT_STATE, STATES, get_candidate_races
 from civiclens.theme import theme_ai_html
@@ -38,12 +38,12 @@ def render():
             with st.spinner(f"Searching for 2026 {cand_state_name} {clean_race} candidates — may take 15–30 seconds…"):
                 if not rate_limit_check("gemini_calls", max_calls=5, window=60):
                     st.toast("⚡ Gemini limit reached, switching to backup…", icon="🔄")
-                    html_output = _candidate_info_fallback(clean_race, cand_state_name)
+                    html_output = candidate_info_fallback(clean_race, cand_state_name)
                 else:
                     html_output = get_candidate_info(clean_race, cand_state_name)
                     if html_output is None:
                         st.toast("⚡ Gemini unavailable, switching to backup…", icon="🔄")
-                        html_output = _candidate_info_fallback(clean_race, cand_state_name)
+                        html_output = candidate_info_fallback(clean_race, cand_state_name)
 
             st.markdown(html_block(theme_ai_html(html_output)), unsafe_allow_html=True)
             if cand_state == "NC":

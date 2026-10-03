@@ -1,10 +1,15 @@
-"""Small shared helpers: rate limiting, party styling, HTML flattening, rep labels."""
+"""Small shared helpers: rate limiting, party styling, HTML escaping/flattening, rep labels."""
+import html
 import re
 import time
 
 import streamlit as st
 
-# RATELIMITERS
+def esc(value) -> str:
+    """Escapes text from users or APIs before it goes into HTML, so a name with "&" or "<"
+    displays as written and can't add its own tags. Also safe inside quoted attributes."""
+    return html.escape("" if value is None else str(value), quote=True)
+
 def rate_limit_check(key: str, max_calls: int = 10, window: int = 60):
     """Block if user has made too many calls in the time window."""
     now = time.time()
@@ -60,7 +65,7 @@ def show_searched_address(address: str):
     if address and address.strip():
         st.markdown(f"""
         <div class="info-box" style="padding:0.55rem 1rem;margin:0 0 0.9rem 0;">
-            📍 <strong>Address:</strong> {address}
+            📍 <strong>Address:</strong> {esc(address)}
         </div>
         """, unsafe_allow_html=True)
 
@@ -93,7 +98,7 @@ def get_chamber_label(rep: dict) -> str:
         title = state_legislator_title(title, (rep.get("jurisdiction") or {}).get("name", ""))
     return f"{title} — District {dist}"
 
-def build_rep_lookup(reps: list, federal: bool = False) -> dict:
+def build_rep_lookup(reps: list) -> dict:
     lookup = {}
     for rep in reps:
         roles = rep.get("current_role", {}) or {}

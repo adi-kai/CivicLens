@@ -46,10 +46,6 @@ def get_state_reps_by_chamber(state_abbr: str, chamber: str) -> tuple:
             return results, str(e)
     return results, ""
 
-# Backwards-compatible alias
-def get_all_nc_reps_by_chamber(chamber: str) -> tuple:
-    return get_state_reps_by_chamber("NC", chamber)
-
 # ── Bill Tracker ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=1800, show_spinner=False)
 def get_state_bills(state_abbr: str, query: str = "", chamber: str = "All") -> tuple:
@@ -75,7 +71,3 @@ def get_state_bills(state_abbr: str, query: str = "", chamber: str = "All") -> t
         return [], f"HTTP {r.status_code}: {r.text[:300]}"
     except Exception as e:
         return [], str(e)
-
-# Backwards-compatible alias
-def get_nc_bills(query: str = "", chamber: str = "All") -> tuple:
-    return get_state_bills("NC", query, chamber)

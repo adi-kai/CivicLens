@@ -13,17 +13,10 @@ LAYER_US_HOUSE       = 0   # 119th Congressional Districts        (STATE field, 
 LAYER_STATE_SENATE   = 1   # 2024 State Legislative Upper/Senate  (STATE field, district: SLDU)
 LAYER_STATE_HOUSE    = 2   # 2024 State Legislative Lower/House   (STATE field, district: SLDL)
 
-# Backwards-compatible aliases (kept in case other code / notebooks reference the old names)
-LAYER_NC_SENATE = LAYER_STATE_SENATE
-LAYER_NC_HOUSE  = LAYER_STATE_HOUSE
-
 # Stable GeoJSON with outlines for all 50 states + DC (avoids shifting TIGERweb State_County layer IDs)
 US_STATES_GEOJSON_URL = (
     "https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json"
 )
-# Backwards-compatible alias
-NC_STATE_GEOJSON_URL = US_STATES_GEOJSON_URL
-
 class TigerFetchError(Exception):
     pass
 

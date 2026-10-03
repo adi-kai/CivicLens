@@ -3,7 +3,7 @@ import streamlit as st
 
 from civiclens.data.ai import get_bill_summary
 from civiclens.data.openstates import get_state_bills
-from civiclens.helpers import html_block, party_css, state_legislator_title
+from civiclens.helpers import esc, html_block, party_css, state_legislator_title
 from civiclens.states import DEFAULT_STATE, STATES
 
 
@@ -58,18 +58,20 @@ def render():
             sponsor_party = sponsor_person.get("party") or ""
             sponsor_title = state_legislator_title((sponsor_person.get("current_role") or {}).get("title", ""), bills_state_name)
             css           = party_css(sponsor_party)
-            tags_html     = "".join(f'<span class="subject-tag">{s}</span>' for s in subjects)
+            tags_html     = "".join(f'<span class="subject-tag">{esc(s)}</span>' for s in subjects)
+            sponsor_line  = (f"{sponsor_title + ' ' if sponsor_title else ''}{sponsor_name}"
+                             f"{' (' + sponsor_party + ')' if sponsor_party else ''}")
             st.markdown(html_block(f"""
             <div class="rep-card {css}" style="padding:0.85rem 1.1rem">
-                <strong>{identifier}</strong>
-                <span style="color:var(--cl-ink);font-size:0.97rem"> — {title}</span><br>
+                <strong>{esc(identifier)}</strong>
+                <span style="color:var(--cl-ink);font-size:0.97rem"> — {esc(title)}</span><br>
                 <span style="color:var(--cl-muted);font-size:0.83rem">
-                    👤 {sponsor_title + ' ' if sponsor_title else ''}{sponsor_name}{' (' + sponsor_party + ')' if sponsor_party else ''}
-                    &nbsp;·&nbsp; 📅 {latest_date}
-                    &nbsp;·&nbsp; {latest_act}
+                    👤 {esc(sponsor_line)}
+                    &nbsp;·&nbsp; 📅 {esc(latest_date)}
+                    &nbsp;·&nbsp; {esc(latest_act)}
                 </span>
                 {"<br>" + tags_html if tags_html else ""}
-                <br><a href="{url}" target="_blank" style="font-size:0.8rem;color:var(--cl-accent);">View full bill on OpenStates →</a>
+                <br><a href="{esc(url)}" target="_blank" style="font-size:0.8rem;color:var(--cl-accent);">View full bill on OpenStates →</a>
             </div>
             """), unsafe_allow_html=True)
 

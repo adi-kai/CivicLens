@@ -13,7 +13,7 @@ from civiclens.data.openstates import get_state_reps_by_chamber
 from civiclens.data.tiger import (LAYER_STATE_HOUSE, LAYER_STATE_SENATE, LAYER_US_HOUSE,
                                   US_STATES_GEOJSON_URL, extract_district_key,
                                   fetch_tiger_geojson)
-from civiclens.helpers import (build_rep_lookup, get_chamber_label, html_block, party_color,
+from civiclens.helpers import (build_rep_lookup, esc, get_chamber_label, html_block, party_color,
                                party_fill, show_searched_address)
 from civiclens.states import DEFAULT_STATE, STATES
 
@@ -31,13 +31,15 @@ def build_district_layer(geojson: dict, rep_lookup: dict, layer_name: str,
         rep_label = get_chamber_label(rep) if rep else ""
         rep_photo = rep.get("image", "")
         fill, opacity = party_fill(rep_party)
+        photo_html = (f"<img src='{esc(rep_photo)}' alt='{esc(rep_name)}' width='55' "
+                      f"style='border-radius:50%;float:right;margin-left:8px'/>" if rep_photo else "")
         popup_html = f"""
         <div style="font-family:sans-serif;min-width:200px;padding:4px">
-            {"<img src='" + rep_photo + "' width='55' style='border-radius:50%;float:right;margin-left:8px'/>" if rep_photo else ""}
-            <strong style="font-size:13px">District {dist_key}</strong><br>
-            <strong>{rep_name}</strong><br>
-            <em style="color:#555;font-size:12px">{rep_label}</em><br>
-            <span style="color:{party_color(rep_party)};font-weight:600">{rep_party}</span>
+            {photo_html}
+            <strong style="font-size:13px">District {esc(dist_key)}</strong><br>
+            <strong>{esc(rep_name)}</strong><br>
+            <em style="color:#555;font-size:12px">{esc(rep_label)}</em><br>
+            <span style="color:{party_color(rep_party)};font-weight:600">{esc(rep_party)}</span>
         </div>"""
         try:
             folium.GeoJson(
@@ -48,7 +50,7 @@ def build_district_layer(geojson: dict, rep_lookup: dict, layer_name: str,
                 highlight_function=lambda f, fill=fill: {
                     "fillColor": fill, "fillOpacity": 0.45, "color": "#333", "weight": 2,
                 },
-                tooltip=f"District {dist_key} — {rep_name} ({rep_party})",
+                tooltip=esc(f"District {dist_key} — {rep_name} ({rep_party})"),
                 popup=folium.Popup(popup_html, max_width=260),
             ).add_to(fg)
         except Exception:
@@ -82,8 +84,8 @@ def render():
     with col1: show_gov      = st.checkbox("Mayor" if manual_state == "DC" else "Governor", value=True)
     with col2: show_us_sen   = st.checkbox("U.S. Senate", value=False)
     with col3: show_us_house = st.checkbox("U.S. House",  value=False)
-    with col4: show_nc_sen   = st.checkbox("State Senate", value=False)
-    with col5: show_nc_house = st.checkbox("State House",  value=False)
+    with col4: show_state_sen   = st.checkbox("State Senate", value=False)
+    with col5: show_state_house = st.checkbox("State House",  value=False)
 
     if st.button("Show Map", type="primary"):
         with st.status("Loading district data…", expanded=True) as load_status:
@@ -102,27 +104,28 @@ def render():
 
             st.write(f"🗺️ Fetching Census district boundaries for {state_name}…")
             geojson_us_house,  us_house_geo_err  = fetch_tiger_geojson(LAYER_US_HOUSE, state_fips, state_abbr)     if show_us_house else ({}, "")
-            geojson_nc_senate, nc_senate_geo_err = fetch_tiger_geojson(LAYER_STATE_SENATE, state_fips, state_abbr) if show_nc_sen   else ({}, "")
-            geojson_nc_house,  nc_house_geo_err  = fetch_tiger_geojson(LAYER_STATE_HOUSE, state_fips, state_abbr)  if show_nc_house else ({}, "")
+            geojson_state_senate, state_senate_geo_err = fetch_tiger_geojson(LAYER_STATE_SENATE, state_fips, state_abbr) if show_state_sen   else ({}, "")
+            geojson_state_house,  state_house_geo_err  = fetch_tiger_geojson(LAYER_STATE_HOUSE, state_fips, state_abbr)  if show_state_house else ({}, "")
             boundary_errors = [
                 (label, layer_id, err) for label, layer_id, err in [
                     ("U.S. House",            LAYER_US_HOUSE,     us_house_geo_err),
-                    (f"{state_name} State Senate", LAYER_STATE_SENATE, nc_senate_geo_err),
-                    (f"{state_name} State House",  LAYER_STATE_HOUSE,  nc_house_geo_err),
+                    (f"{state_name} State Senate", LAYER_STATE_SENATE, state_senate_geo_err),
+                    (f"{state_name} State House",  LAYER_STATE_HOUSE,  state_house_geo_err),
                 ] if err
             ]
 
             st.write("👥 Loading representative data…")
-            nc_senate_reps, nc_senate_err = get_state_reps_by_chamber(state_abbr, "upper") if show_nc_sen   else ([], "")
-            nc_house_reps,  nc_house_err  = get_state_reps_by_chamber(state_abbr, "lower") if show_nc_house else ([], "")
+            # A failed roster load is reported below as a missing-names warning
+            state_senate_reps, _ = get_state_reps_by_chamber(state_abbr, "upper") if show_state_sen   else ([], "")
+            state_house_reps,  _ = get_state_reps_by_chamber(state_abbr, "lower") if show_state_house else ([], "")
             us_house_reps  = get_federal_house_members(state_abbr)                        if show_us_house else []
             us_senators    = get_federal_senators(state_abbr)                             if show_us_sen   else []
             governor, governor_err = get_governor(state_abbr) if show_gov else (None, "")
             gov_office = "Mayor" if state_abbr == "DC" else "Governor"
 
-            lookup_nc_senate = build_rep_lookup(nc_senate_reps)
-            lookup_nc_house  = build_rep_lookup(nc_house_reps)
-            lookup_us_house  = build_rep_lookup(us_house_reps, federal=True)
+            lookup_state_senate = build_rep_lookup(state_senate_reps)
+            lookup_state_house  = build_rep_lookup(state_house_reps)
+            lookup_us_house  = build_rep_lookup(us_house_reps)
             if boundary_errors:
                 load_status.update(label="⚠️ Map loaded with errors — see below", state="error", expanded=False)
             else:
@@ -138,9 +141,9 @@ def render():
             )
 
         # Surface rep-load failures (st.warning not allowed inside cached functions)
-        if show_nc_sen and not nc_senate_reps:
+        if show_state_sen and not state_senate_reps:
             st.warning(f"⚠️ Could not load {state_name} State Senate representatives. Boundaries will show without rep names.")
-        if show_nc_house and not nc_house_reps:
+        if show_state_house and not state_house_reps:
             st.warning(f"⚠️ Could not load {state_name} State House representatives. Boundaries will show without rep names.")
         if show_us_house and not us_house_reps:
             st.warning("⚠️ Could not load U.S. House representatives. Boundaries will show without rep names.")
@@ -185,19 +188,19 @@ def render():
                 gov_fg = folium.FeatureGroup(name=gov_office, show=True)
                 if governor:
                     gov_photo_html = (
-                        f"<img src='{governor['photo']}' width='45' "
+                        f"<img src='{esc(governor['photo'])}' alt='{esc(governor['name'])}' width='45' "
                         f"style='border-radius:50%;float:right;margin-left:8px'/>"
                         if governor["photo"] else ""
                     )
                     popup_html = html_block(f"""
                     <div style="font-family:sans-serif;min-width:200px">
                         {gov_photo_html}
-                        <strong>{governor['name']}</strong><br>
+                        <strong>{esc(governor['name'])}</strong><br>
                         <em style="color:#555">{governor['office']} of {state_name}</em><br>
-                        <span style="color:{party_color(governor['party'])};font-weight:600">{governor['party']}</span><br>
+                        <span style="color:{party_color(governor['party'])};font-weight:600">{esc(governor['party'])}</span><br>
                         {governor_links_html(governor)}
                     </div>""")
-                    tooltip = f"{governor['office']}: {governor['name']} ({governor['party']})"
+                    tooltip = esc(f"{governor['office']}: {governor['name']} ({governor['party']})")
                 else:
                     popup_html = html_block(f"""
                     <div style="font-family:sans-serif;min-width:200px">
@@ -226,15 +229,15 @@ def render():
                         site_html = ""
                         if senator["url"]:
                             host = re.sub(r"^https?://(www\.)?", "", senator["url"]).rstrip("/")
-                            site_html = f"<a href='{senator['url']}' target='_blank'>{host}</a><br>"
+                            site_html = f"<a href='{esc(senator['url'])}' target='_blank'>{esc(host)}</a><br>"
                         photo_html = (
-                            f"<img src='{senator['image']}' width='45' "
+                            f"<img src='{esc(senator['image'])}' alt='{esc(senator['name'])}' width='45' "
                             f"style='border-radius:50%;margin-right:6px'/>"
                             if senator["image"] else ""
                         )
                         senator_blocks += (
-                            f"{photo_html}<strong>{senator['name']}</strong> "
-                            f"<span style=\"color:{party_color(senator['party'])}\">{senator['party']}</span><br>"
+                            f"{photo_html}<strong>{esc(senator['name'])}</strong> "
+                            f"<span style=\"color:{party_color(senator['party'])}\">{esc(senator['party'])}</span><br>"
                             f"{site_html}<br>"
                         )
                     popup_html = html_block(f"""
@@ -242,9 +245,9 @@ def render():
                         <strong>{state_name} U.S. Senators</strong><br><br>
                         {senator_blocks}
                     </div>""")
-                    tooltip = "U.S. Senators: " + " & ".join(
+                    tooltip = esc("U.S. Senators: " + " & ".join(
                         f"{s['name']} ({s['party'][:1]})" for s in us_senators
-                    )
+                    ))
                 else:
                     no_senators = state_abbr == "DC"
                     detail = ("The District of Columbia has no voting U.S. Senators."
@@ -270,10 +273,10 @@ def render():
 
         if show_us_house and geojson_us_house:
             build_district_layer(geojson_us_house, lookup_us_house, "U.S. House",  district_field="CD119").add_to(m)
-        if show_nc_sen and geojson_nc_senate:
-            build_district_layer(geojson_nc_senate, lookup_nc_senate, f"{state_name} State Senate", district_field="SLDU").add_to(m)
-        if show_nc_house and geojson_nc_house:
-            build_district_layer(geojson_nc_house, lookup_nc_house, f"{state_name} State House", district_field="SLDL").add_to(m)
+        if show_state_sen and geojson_state_senate:
+            build_district_layer(geojson_state_senate, lookup_state_senate, f"{state_name} State Senate", district_field="SLDU").add_to(m)
+        if show_state_house and geojson_state_house:
+            build_district_layer(geojson_state_house, lookup_state_house, f"{state_name} State House", district_field="SLDL").add_to(m)
 
         if lat:
             folium.Marker(
@@ -291,6 +294,7 @@ def render():
             <span style="font-size:0.78rem;color:var(--cl-muted);margin-left:auto">Click any district for rep details</span>
         </div>
         """, unsafe_allow_html=True)
-        st_folium(m, width=950, height=580, returned_objects=[])
+        # Fill the column instead of a fixed width, so the map fits on phones
+        st_folium(m, use_container_width=True, height=580, returned_objects=[])
         st.caption("District boundaries: U.S. Census Bureau TIGERweb · State legislators: OpenStates API · "
                    "Congress: unitedstates/congress-legislators · Governors: Wikidata")

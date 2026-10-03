@@ -5,7 +5,7 @@ import streamlit as st
 from civiclens.config import GOOGLE_KEY
 from civiclens.states import DEFAULT_STATE, STATES
 
-# FIX #4a — Discover the active election ID dynamically
+# Google only returns polling places for a tracked election, so find the current one
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_active_election_id() -> str:
     try:
@@ -21,7 +21,6 @@ def get_active_election_id() -> str:
         pass
     return "2000"
 
-# FIX #4b — Use dynamic election ID
 @st.cache_data(ttl=1800, show_spinner=False)
 def get_voter_info(address: str):
     return requests.get(

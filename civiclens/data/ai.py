@@ -37,11 +37,11 @@ Respond with only the summary — no intro, no labels, no markdown."""
     except Exception as e:
         return f"⚠️ Error: {e}"
 
-# ── Candidates — powered by Gemini 1.5 Flash + Google Search (FREE) ──────────
+# ── Candidates — Gemini 2.5 Flash with Google Search grounding ───────────────
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_candidate_info(race: str, state_name: str) -> str:
     if not GEMINI_KEY:
-        return _candidate_info_fallback(race, state_name)
+        return candidate_info_fallback(race, state_name)
 
     prompt = f"""You are a nonpartisan civic information assistant for CivicLens, a voter education app.
 
@@ -109,9 +109,9 @@ Be strictly factual and nonpartisan. List ALL major-party candidates."""
             raise Exception("Gemini returned empty")
 
     except Exception:
-        return None  #
+        return None  # the tab switches to the Groq + Tavily fallback
 
-def _candidate_info_fallback(race: str, state_name: str) -> str:
+def candidate_info_fallback(race: str, state_name: str) -> str:
     """Groq (GPT-OSS 120B) + Tavily search — runs when Gemini is down."""
     if not GROQ_KEY or not TAVILY_KEY:
         return '<p style="color:#c0392b;">⚠️ Gemini is currently overloaded and no fallback keys are configured. Please try again in a minute.</p>'

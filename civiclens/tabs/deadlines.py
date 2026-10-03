@@ -25,7 +25,7 @@ def render():
 
     show_searched_address(dl_address)
 
-    st.markdown(f"""
+    st.markdown("""
     <div class="rep-card other">
         <strong>Election Day</strong><br>
         📅 <em>November 3, 2026</em><br>

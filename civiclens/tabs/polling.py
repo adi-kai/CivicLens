@@ -3,7 +3,7 @@ import streamlit as st
 
 from civiclens.data.civic import get_official_resources, get_voter_info
 from civiclens.data.geocode import geocode
-from civiclens.helpers import show_searched_address
+from civiclens.helpers import esc, show_searched_address
 from civiclens.states import STATES
 
 
@@ -31,9 +31,9 @@ def render():
                 st.success("✅ Polling location found!")
                 st.markdown(f"""
                 <div class="info-box">
-                    <strong>{addr.get('locationName', 'Polling Location')}</strong><br>
-                    {addr.get('line1', '')}<br>
-                    {addr.get('city', '')}, {addr.get('state', '')} {addr.get('zip', '')}
+                    <strong>{esc(addr.get('locationName', 'Polling Location'))}</strong><br>
+                    {esc(addr.get('line1', ''))}<br>
+                    {esc(addr.get('city', ''))}, {esc(addr.get('state', ''))} {esc(addr.get('zip', ''))}
                 </div>
                 """, unsafe_allow_html=True)
                 hours = loc.get("pollingHours", "")

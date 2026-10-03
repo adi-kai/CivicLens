@@ -3,7 +3,8 @@ import streamlit as st
 
 from civiclens.data.geocode import geocode
 from civiclens.data.openstates import get_reps_by_location
-from civiclens.helpers import get_chamber_label, html_block, is_federal, is_state, party_badge, party_css
+from civiclens.helpers import (esc, get_chamber_label, html_block, is_federal, is_state,
+                               party_badge, party_css)
 from civiclens.states import STATES
 
 
@@ -49,13 +50,14 @@ def render():
                         ' <span style="background:#d4edda;color:#155724;padding:1px 8px;'
                         'border-radius:10px;font-size:0.72rem;font-weight:600;">Shared</span>'
                     ) if shared else ""
-                    img_html = f"<img src='{photo}' width='45' style='border-radius:50%;float:right;margin-left:8px'/>" if photo else ""
+                    img_html = (f"<img src='{esc(photo)}' alt='{esc(name)}' width='45' "
+                                f"style='border-radius:50%;float:right;margin-left:8px'/>" if photo else "")
                     return html_block(f"""
                     <div class="rep-card {css}">
                         {img_html}
-                        <strong>{name}</strong>{shared_html}
-                        <span class="party-badge {badge}">{party}</span><br>
-                        <span style="color:var(--cl-muted);font-size:0.85rem">{label}</span>
+                        <strong>{esc(name)}</strong>{shared_html}
+                        <span class="party-badge {badge}">{esc(party)}</span><br>
+                        <span style="color:var(--cl-muted);font-size:0.85rem">{esc(label)}</span>
                     </div>""")
 
                 def sort_reps(reps):
