@@ -8,6 +8,12 @@ CivicLens helps first-time and returning voters find their representatives, trac
 
 Built for the 2026 election cycle.
 
+| My Representatives | Rep Map |
+|---|---|
+| ![Governor, U.S. Senators, and U.S. Representative for an address](docs/screenshots/my-representatives.png) | ![North Carolina's U.S. House districts colored by party](docs/screenshots/rep-map.png) |
+| **Deadlines** | **Bill Tracker** |
+| ![North Carolina 2026 voting deadlines with sources](docs/screenshots/deadlines.png) | ![Recent North Carolina bills with sponsors and subjects](docs/screenshots/bill-tracker.png) |
+
 ---
 
 ## Features

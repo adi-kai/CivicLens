@@ -162,7 +162,10 @@ def render():
             fallback_lat, fallback_lng, _ = geocode(f"{state_name}, USA")
             center = [fallback_lat, fallback_lng] if fallback_lat else [35.5, -79.5]
             zoom = 7
-        m = folium.Map(location=center, zoom_start=zoom, tiles="CartoDB positron")
+        # OpenStreetMap's standard tiles need no key. (CARTO's free basemaps now serve an
+        # "API KEY REQUIRED" watermark instead of a map.)
+        m = folium.Map(location=center, zoom_start=zoom, tiles=None)
+        folium.TileLayer("OpenStreetMap", name="Street map").add_to(m)
 
         # Fetch the selected state's outline once and reuse for both Governor and US Senate overlays.
         # Using a stable GitHub-hosted GeoJSON instead of the shifting TIGERweb State_County layer.
