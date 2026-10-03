@@ -21,16 +21,89 @@ except Exception:
     GEMINI_KEY = ""
 
 # TIGERweb — current (2025-2026) layer IDs for the Legislative MapServer
+# These layer IDs are national — the same MapServer covers every state, you just
+# filter by FIPS code in the WHERE clause.
 # Verify at: tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer
-TIGER_BASE      = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer"
-LAYER_US_HOUSE  = 0   # 119th Congressional Districts       (STATE field, district: CD119)
-LAYER_NC_SENATE = 1   # 2024 State Legislative Upper/Senate  (STATE field, district: SLDU)
-LAYER_NC_HOUSE  = 2   # 2024 State Legislative Lower/House   (STATE field, district: SLDL)
-NC_FIPS         = "37"
-# Stable GeoJSON for NC state outline (avoids shifting TIGERweb State_County layer IDs)
-NC_STATE_GEOJSON_URL = (
+TIGER_BASE           = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer"
+LAYER_US_HOUSE       = 0   # 119th Congressional Districts        (STATE field, district: CD119)
+LAYER_STATE_SENATE   = 1   # 2024 State Legislative Upper/Senate  (STATE field, district: SLDU)
+LAYER_STATE_HOUSE    = 2   # 2024 State Legislative Lower/House   (STATE field, district: SLDL)
+
+# Backwards-compatible aliases (kept in case other code / notebooks reference the old names)
+LAYER_NC_SENATE = LAYER_STATE_SENATE
+LAYER_NC_HOUSE  = LAYER_STATE_HOUSE
+
+# Stable GeoJSON with outlines for all 50 states + DC (avoids shifting TIGERweb State_County layer IDs)
+US_STATES_GEOJSON_URL = (
     "https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json"
 )
+# Backwards-compatible alias
+NC_STATE_GEOJSON_URL = US_STATES_GEOJSON_URL
+
+# ── National state registry: USPS abbreviation → FIPS code + full name ───────
+# Used to parameterize every fetcher (TIGERweb, OpenStates, bills) by state,
+# and to auto-detect the right state from a geocoded address.
+STATES = {
+    "AL": {"fips": "01", "name": "Alabama"},
+    "AK": {"fips": "02", "name": "Alaska"},
+    "AZ": {"fips": "04", "name": "Arizona"},
+    "AR": {"fips": "05", "name": "Arkansas"},
+    "CA": {"fips": "06", "name": "California"},
+    "CO": {"fips": "08", "name": "Colorado"},
+    "CT": {"fips": "09", "name": "Connecticut"},
+    "DE": {"fips": "10", "name": "Delaware"},
+    "DC": {"fips": "11", "name": "District of Columbia"},
+    "FL": {"fips": "12", "name": "Florida"},
+    "GA": {"fips": "13", "name": "Georgia"},
+    "HI": {"fips": "15", "name": "Hawaii"},
+    "ID": {"fips": "16", "name": "Idaho"},
+    "IL": {"fips": "17", "name": "Illinois"},
+    "IN": {"fips": "18", "name": "Indiana"},
+    "IA": {"fips": "19", "name": "Iowa"},
+    "KS": {"fips": "20", "name": "Kansas"},
+    "KY": {"fips": "21", "name": "Kentucky"},
+    "LA": {"fips": "22", "name": "Louisiana"},
+    "ME": {"fips": "23", "name": "Maine"},
+    "MD": {"fips": "24", "name": "Maryland"},
+    "MA": {"fips": "25", "name": "Massachusetts"},
+    "MI": {"fips": "26", "name": "Michigan"},
+    "MN": {"fips": "27", "name": "Minnesota"},
+    "MS": {"fips": "28", "name": "Mississippi"},
+    "MO": {"fips": "29", "name": "Missouri"},
+    "MT": {"fips": "30", "name": "Montana"},
+    "NE": {"fips": "31", "name": "Nebraska"},
+    "NV": {"fips": "32", "name": "Nevada"},
+    "NH": {"fips": "33", "name": "New Hampshire"},
+    "NJ": {"fips": "34", "name": "New Jersey"},
+    "NM": {"fips": "35", "name": "New Mexico"},
+    "NY": {"fips": "36", "name": "New York"},
+    "NC": {"fips": "37", "name": "North Carolina"},
+    "ND": {"fips": "38", "name": "North Dakota"},
+    "OH": {"fips": "39", "name": "Ohio"},
+    "OK": {"fips": "40", "name": "Oklahoma"},
+    "OR": {"fips": "41", "name": "Oregon"},
+    "PA": {"fips": "42", "name": "Pennsylvania"},
+    "RI": {"fips": "44", "name": "Rhode Island"},
+    "SC": {"fips": "45", "name": "South Carolina"},
+    "SD": {"fips": "46", "name": "South Dakota"},
+    "TN": {"fips": "47", "name": "Tennessee"},
+    "TX": {"fips": "48", "name": "Texas"},
+    "UT": {"fips": "49", "name": "Utah"},
+    "VT": {"fips": "50", "name": "Vermont"},
+    "VA": {"fips": "51", "name": "Virginia"},
+    "WA": {"fips": "53", "name": "Washington"},
+    "WV": {"fips": "54", "name": "West Virginia"},
+    "WI": {"fips": "55", "name": "Wisconsin"},
+    "WY": {"fips": "56", "name": "Wyoming"},
+}
+DEFAULT_STATE = "NC"
+
+# Reverse lookup: full lowercase state name → USPS abbreviation (for parsing
+# Nominatim's "address.state" field, which comes back as a full name).
+STATE_NAME_TO_ABBR = {info["name"].lower(): abbr for abbr, info in STATES.items()}
+# Nominatim sometimes returns DC under a different label
+STATE_NAME_TO_ABBR["washington, d.c."] = "DC"
+STATE_NAME_TO_ABBR["washington dc"]    = "DC"
 
 
 
@@ -56,8 +129,10 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600&display=swap');
     html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
     h1, h2, h3 { font-family: 'DM Serif Display', serif; }
+
     .rep-card {
         background: #f8f9fa;
+        color: #1a1a1a;              /* ADDED: force dark text on light card */
         border-left: 5px solid #888;
         border-radius: 8px;
         padding: 1rem 1.25rem;
@@ -66,6 +141,7 @@ st.markdown("""
     .rep-card.republican { border-left-color: #c0392b; }
     .rep-card.democrat   { border-left-color: #1a73e8; }
     .rep-card.other      { border-left-color: #7f8c8d; }
+
     .party-badge {
         display: inline-block;
         padding: 2px 10px;
@@ -77,6 +153,7 @@ st.markdown("""
     .badge-democrat   { background: #d6e4ff; color: #1a3c8f; }
     .badge-republican { background: #ffe0dd; color: #8b1a1a; }
     .badge-other      { background: #e8e8e8; color: #444; }
+
     .section-label {
         font-size: 0.75rem;
         font-weight: 600;
@@ -85,14 +162,18 @@ st.markdown("""
         color: #888;
         margin: 1.5rem 0 0.5rem 0;
     }
+
     .info-box {
         background: #eaf3fb;
+        color: #1a1a1a;              /* ADDED */
         border-radius: 8px;
         padding: 0.9rem 1.2rem;
         margin-top: 0.5rem;
     }
+
     .map-legend {
         background: white;
+        color: #1a1a1a;              /* ADDED */
         border-radius: 8px;
         padding: 0.75rem 1rem;
         margin-bottom: 1rem;
@@ -103,13 +184,14 @@ st.markdown("""
     }
     .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; }
     .legend-dot  { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+
     .subject-tag {
         display: inline-block;
         padding: 1px 8px;
         border-radius: 12px;
         font-size: 0.72rem;
         background: #e9ecef;
-        color: #495057;
+        color: #495057;              /* already had color, this one was fine */
         margin-right: 4px;
         margin-top: 4px;
     }
@@ -152,20 +234,47 @@ def party_fill(party: str) -> tuple:
     return "#888888", 0.15
 
 # FIX #6 — Cache geocoding (24 hr TTL)
+# National update: now also auto-detects the state (USPS abbreviation) from the
+# geocoded address so every downstream fetcher (map, reps, bills) knows which
+# state to query without the user having to pick one manually.
 @st.cache_data(ttl=86400, show_spinner=False)
 def geocode(address: str):
+    """Returns (lat, lon, state_abbr). state_abbr is None if it can't be determined."""
     try:
         r = requests.get(
             "https://nominatim.openstreetmap.org/search",
-            params={"q": address, "format": "json", "limit": 1},
+            params={"q": address, "format": "json", "limit": 1, "addressdetails": 1},
             headers={"User-Agent": "CivicLens/1.0"},
             timeout=10
         ).json()
         if r:
-            return float(r[0]["lat"]), float(r[0]["lon"])
+            result = r[0]
+            lat, lon = float(result["lat"]), float(result["lon"])
+            addr = result.get("address", {}) or {}
+
+            state_abbr = None
+            # Most reliable: ISO3166-2-lvl4 comes back as "US-NC"
+            iso = (addr.get("ISO3166-2-lvl4") or "").upper()
+            if iso.startswith("US-") and iso.split("-")[-1] in STATES:
+                state_abbr = iso.split("-")[-1]
+            # Fallback: match the full state name Nominatim returns
+            if not state_abbr:
+                state_name = (addr.get("state") or "").strip().lower()
+                state_abbr = STATE_NAME_TO_ABBR.get(state_name)
+
+            return lat, lon, state_abbr
     except Exception:
         pass
-    return None, None
+    return None, None, None
+
+def show_searched_address(address: str):
+    """Prints the address actually being used, right above whatever results follow."""
+    if address and address.strip():
+        st.markdown(f"""
+        <div class="info-box" style="padding:0.55rem 1rem;margin:0 0 0.9rem 0;">
+            📍 <strong>Address:</strong> {address}
+        </div>
+        """, unsafe_allow_html=True)
 
 # FIX #4a — Discover the active election ID dynamically
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -184,12 +293,40 @@ def get_active_election_id() -> str:
     return "2000"
 
 # FIX #4b — Use dynamic election ID
+@st.cache_data(ttl=1800, show_spinner=False)
 def get_voter_info(address: str):
     return requests.get(
         "https://www.googleapis.com/civicinfo/v2/voterinfo",
         params={"address": address, "electionId": get_active_election_id(), "key": GOOGLE_KEY}
     ).json()
 
+# ── National voting resource links ────────────────────────────────────────────
+# vote.gov publishes a stable per-state registration page at /register/{abbr}/,
+# so that one link personalizes cleanly for all 50 states + DC. vote.org and the
+# EAC's directory both accept any U.S. address/state on their own site, so they
+# work as reliable nationwide fallbacks. We only keep NC's original hand-verified
+# NCSBE deep links, since those are known-good; other states get the same
+# high-quality generic tools rather than guessed-at state URLs.
+def get_official_resources(state_abbr: str) -> list:
+    """Returns [(label, url), ...] of official/national resources for the given state."""
+    abbr = (state_abbr or DEFAULT_STATE).upper()
+    if abbr == "NC":
+        return [
+            ("Find Your Polling Place — NCSBE", "https://vt.ncsbe.gov/PPLkup/"),
+            ("Check Registration Status — NCSBE", "https://vt.ncsbe.gov/RegLkup/"),
+            ("Register to Vote — NCSBE", "https://www.ncsbe.gov/registering/how-register"),
+            ("Absentee Ballot Info — NCSBE", "https://www.ncsbe.gov/voting/vote-absentee-ballot"),
+        ]
+    state_name = STATES.get(abbr, {}).get("name", abbr)
+    return [
+        (f"Register to Vote in {state_name} — Vote.gov", f"https://vote.gov/register/{abbr.lower()}/"),
+        ("Check Your Registration Status — Vote.org", "https://www.vote.org/am-i-registered-to-vote/"),
+        ("Find Your Polling Place — Vote.org", "https://www.vote.org/polling-place-locator/"),
+        ("Absentee / Mail Voting Info — Vote.org", "https://www.vote.org/absentee-ballot/"),
+        ("Your State Election Office — U.S. EAC Directory", "https://www.eac.gov/voters/register-and-vote-in-your-state"),
+    ]
+
+@st.cache_data(ttl=3600, show_spinner=False)
 def get_reps_by_location(lat: float, lng: float) -> list:
     try:
         r = requests.get(
@@ -216,20 +353,21 @@ def get_chamber_label(rep: dict) -> str:
     org   = roles.get("org_classification", "")
     title = roles.get("title", "")
     if is_federal(rep):
-        return "U.S. Senator — North Carolina" if org == "upper" else f"U.S. House — District {dist}"
+        if org == "upper":
+            state_name = (rep.get("jurisdiction", {}) or {}).get("name", "")
+            return f"U.S. Senator — {state_name}" if state_name else "U.S. Senator"
+        return f"U.S. House — District {dist}"
     return f"{title} — District {dist}"
 
-# Robust TIGERweb fetch — tries every known where-clause variant for NC
+# Robust TIGERweb fetch — tries every known where-clause variant for the given state
 @st.cache_data(ttl=3600, show_spinner=False)
-def fetch_tiger_geojson(layer_id: int) -> dict:
+def fetch_tiger_geojson(layer_id: int, state_fips: str, state_abbr: str = "") -> dict:
     url = f"{TIGER_BASE}/{layer_id}/query"
     # Try all known field-name variants the Census API has used across years
     # These layers use STATE (2-char FIPS string), NOT STATEFP — verified against layer schema June 2026
-    where_clauses = [
-        "STATE='37'",
-        "STATE=37",
-        "STUSPS='NC'",
-    ]
+    where_clauses = [f"STATE='{state_fips}'", f"STATE={int(state_fips)}"]
+    if state_abbr:
+        where_clauses.append(f"STUSPS='{state_abbr}'")
     last_error = ""
     for where_clause in where_clauses:
         try:
@@ -335,14 +473,17 @@ def build_district_layer(geojson: dict, rep_lookup: dict, layer_name: str,
     return fg
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def get_all_nc_reps_by_chamber(chamber: str) -> tuple:
-    """Returns (list_of_reps, error_message). Paginates since max per_page is 50."""
+def get_state_reps_by_chamber(state_abbr: str, chamber: str) -> tuple:
+    """Returns (list_of_reps, error_message). Paginates since max per_page is 50.
+    state_abbr is a USPS abbreviation (e.g. 'NC', 'CA'); OpenStates jurisdiction
+    slugs are just the lowercase state abbreviation."""
     results = []
+    jurisdiction = (state_abbr or DEFAULT_STATE).lower()
     for page in range(1, 6):  # up to 250 reps, more than enough
         try:
             r = requests.get(
                 "https://v3.openstates.org/people",
-                params={"jurisdiction": "nc", "org_classification": chamber,
+                params={"jurisdiction": jurisdiction, "org_classification": chamber,
                         "per_page": 50, "page": page},
                 headers={"X-API-KEY": OPENSTATES_KEY},
                 timeout=15,
@@ -357,15 +498,21 @@ def get_all_nc_reps_by_chamber(chamber: str) -> tuple:
             return results, str(e)
     return results, ""
 
+# Backwards-compatible alias
+def get_all_nc_reps_by_chamber(chamber: str) -> tuple:
+    return get_state_reps_by_chamber("NC", chamber)
+
 @st.cache_data(ttl=3600, show_spinner=False)
-def get_nc_federal_members() -> list:
+def get_federal_house_members(state_abbr: str) -> list:
     """
-    Fetch NC's current U.S. House members.
+    Fetch a given state's current U.S. House members.
     OpenStates only covers state legislatures, NOT Congress.
     We use the unitedstates/congress-legislators JSON (public domain, no API key).
     Returns a list of dicts shaped like OpenStates people objects so the rest of
     the code (build_rep_lookup, get_chamber_label, party_fill, etc.) works unchanged.
     """
+    state_abbr = (state_abbr or DEFAULT_STATE).upper()
+    state_name = STATES.get(state_abbr, {}).get("name", state_abbr)
     try:
         r = requests.get(
             "https://unitedstates.github.io/congress-legislators/legislators-current.json",
@@ -374,7 +521,7 @@ def get_nc_federal_members() -> list:
         if r.status_code != 200:
             return []
         members = r.json()
-        nc_house = []
+        house_members = []
         for m in members:
             terms = m.get("terms", [])
             if not terms:
@@ -383,7 +530,7 @@ def get_nc_federal_members() -> list:
             if latest.get("type") != "rep":
                 continue
             state = latest.get("state", "")
-            if state != "NC":
+            if state != state_abbr:
                 continue
             district = str(latest.get("district", ""))
             # Map party abbreviations to full names OpenStates uses
@@ -394,7 +541,7 @@ def get_nc_federal_members() -> list:
             name_obj = m.get("name", {})
             full_name = f"{name_obj.get('first', '')} {name_obj.get('last', '')}".strip()
             # Build an OpenStates-shaped dict so downstream code needs no changes
-            nc_house.append({
+            house_members.append({
                 "name": full_name,
                 "party": party,
                 "image": f"https://unitedstates.github.io/images/congress/225x275/{m.get('id', {}).get('bioguide', '')}.jpg",
@@ -402,13 +549,17 @@ def get_nc_federal_members() -> list:
                 "current_role": {
                     "title": "U.S. Representative",
                     "org_classification": "lower",
-                    "district": f"NC-{district}",
+                    "district": f"{state_abbr}-{district}",
                 },
-                "jurisdiction": {"classification": "country"},
+                "jurisdiction": {"classification": "country", "name": state_name},
             })
-        return nc_house
+        return house_members
     except Exception:
         return []
+
+# Backwards-compatible alias
+def get_nc_federal_members() -> list:
+    return get_federal_house_members("NC")
 
 def build_rep_lookup(reps: list, federal: bool = False) -> dict:
     lookup = {}
@@ -457,9 +608,10 @@ Respond with only the summary — no intro, no labels, no markdown."""
 
 # ── Bill Tracker ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=1800, show_spinner=False)
-def get_nc_bills(query: str = "", chamber: str = "All") -> tuple:
+def get_state_bills(state_abbr: str, query: str = "", chamber: str = "All") -> tuple:
     """Returns (list_of_bills, error_message)"""
-    params: dict = {"jurisdiction": "nc", "per_page": 20, "sort": "updated_desc"}
+    jurisdiction = (state_abbr or DEFAULT_STATE).lower()
+    params: dict = {"jurisdiction": jurisdiction, "per_page": 20, "sort": "updated_desc"}
     if query.strip():
         params["q"] = query.strip()
     if chamber == "House":
@@ -478,6 +630,10 @@ def get_nc_bills(query: str = "", chamber: str = "All") -> tuple:
         return [], f"HTTP {r.status_code}: {r.text[:300]}"
     except Exception as e:
         return [], str(e)
+
+# Backwards-compatible alias
+def get_nc_bills(query: str = "", chamber: str = "All") -> tuple:
+    return get_state_bills("NC", query, chamber)
 
 # ── Candidates — powered by Gemini 1.5 Flash + Google Search (FREE) ──────────
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -690,8 +846,8 @@ if menu == "🏠 Home":
 
     | Tab | What it does |
     |---|---|
-    | 📍 **Polling Finder** | Locate your polling place by address |
-    | 📅 **Deadlines** | Key NC 2026 registration & voting dates |
+    | 📍 **Polling Finder** | Locate your polling place by address — any U.S. state |
+    | 📅 **Deadlines** | Election Day + your state's registration & voting resources |
     | 🏛️ **My Representatives** | Every rep who represents you — state and federal |
     | 🗺️ **Rep Map** | Interactive NC district map colored by party |
     | 📋 **Bill Tracker** | Browse and search active NC legislation |
@@ -707,6 +863,7 @@ if menu == "🏠 Home":
 # ─────────────────────────────────────────────
 elif menu == "📍 Polling Finder":
     st.header("📍 Find Your Polling Place")
+    st.caption("Works for any U.S. address — powered by the Google Civic Information API.")
     address = st.text_input("Enter your full address (e.g. 123 Main St, Charlotte, NC 28201)")
 
     if st.button("Search", type="primary"):
@@ -715,6 +872,12 @@ elif menu == "📍 Polling Finder":
         else:
             with st.spinner("Looking up your polling place…"):
                 data = get_voter_info(address)
+                _, _, detected_state = geocode(address)
+
+            state_info = STATES.get(detected_state, {})
+            state_name = state_info.get("name", "")
+
+            show_searched_address(address)
 
             if "pollingLocations" in data and data["pollingLocations"]:
                 loc  = data["pollingLocations"][0]
@@ -731,55 +894,110 @@ elif menu == "📍 Polling Finder":
                 if hours:
                     st.caption(f"🕐 Hours: {hours}")
             else:
-                st.warning("Polling location not available right now — no active election. Use these NC resources:")
+                st.warning("Polling location not available right now — no active election. Use these resources:")
 
-            st.subheader("🗳️ North Carolina Voting Resources")
-            st.markdown("- [Find Your Polling Place](https://vt.ncsbe.gov/PPLkup/)")
-            st.markdown("- [Check Registration Status](https://vt.ncsbe.gov/RegLkup/)")
-            st.markdown("- [Register to Vote](https://www.ncsbe.gov/registering/how-register)")
-            st.markdown("- [Absentee Ballot Info](https://www.ncsbe.gov/voting/vote-absentee-ballot)")
+            # Prefer any official links Google's Civic API returns for this
+            # address's state administration body; fall back to our curated list.
+            admin_bodies = (data.get("state") or [{}])[0].get("electionAdministrationBody", {}) if data.get("state") else {}
+            civic_links = [
+                ("Voting Location Finder", admin_bodies.get("votingLocationFinderUrl")),
+                ("Register to Vote", admin_bodies.get("electionRegistrationUrl")),
+                ("Absentee / Mail Voting Info", admin_bodies.get("absenteeVotingInfoUrl")),
+                ("Ballot Information", admin_bodies.get("ballotInfoUrl")),
+            ]
+            civic_links = [(label, url) for label, url in civic_links if url]
+
+            st.subheader(f"🗳️ {state_name + ' ' if state_name else ''}Voting Resources")
+            links_to_show = civic_links if civic_links else get_official_resources(detected_state)
+            for label, url in links_to_show:
+                st.markdown(f"- [{label}]({url})")
 
 # ─────────────────────────────────────────────
 # DEADLINES
 # ─────────────────────────────────────────────
 elif menu == "📅 Deadlines":
-    st.header("📅 Key Voting Deadlines — NC 2026")
-    deadlines = [
-        ("Voter Registration Deadline",          "October 11, 2026",    "Register online, by mail, or in person."),
-        ("Same-Day Registration (Early Voting)",  "During early voting", "Register and vote at your early voting site."),
-        ("Early Voting Begins",                   "October 15, 2026",   "No excuse needed in NC."),
-        ("Early Voting Ends",                     "November 1, 2026",   "Last day to vote early."),
-        ("Absentee Ballot Request Deadline",      "October 29, 2026",   "Request must be received by this date."),
-        ("Election Day",                          "November 3, 2026",   "Polls open 6:30 AM – 7:30 PM."),
-    ]
-    for name, date, note in deadlines:
-        st.markdown(f"""
-        <div class="rep-card other">
-            <strong>{name}</strong><br>
-            📅 <em>{date}</em><br>
-            <span style="color:#555;font-size:0.9rem">{note}</span>
-        </div>
-        """, unsafe_allow_html=True)
-    st.caption("Always verify at [ncsbe.gov](https://www.ncsbe.gov).")
+    st.header("📅 Key Voting Deadlines — 2026")
+    st.caption("Election Day itself is set federally — the same date nationwide. "
+               "Registration and early-voting windows are set by each state, so enter your address below to see yours.")
+
+    dl_address = st.text_input("Enter your address", key="dl_address")
+
+    dl_state = None
+    if dl_address.strip():
+        with st.spinner("Locating address…"):
+            _, _, dl_state = geocode(dl_address)
+        if not dl_state:
+            st.warning("Could not determine the state for that address — try adding your city and zip code.")
+
+    dl_state_name = STATES.get(dl_state, {}).get("name", "")
+
+    show_searched_address(dl_address)
+
+    st.markdown(f"""
+    <div class="rep-card other">
+        <strong>Election Day</strong><br>
+        📅 <em>November 3, 2026</em><br>
+        <span style="color:#555;font-size:0.9rem">Polls open per your state and county's posted hours. Set by federal law — the same date nationwide.</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    if not dl_state:
+        st.info("Enter your address above to see registration and early-voting resources for your state.")
+    elif dl_state == "NC":
+        st.markdown(f'<p class="section-label">🏛️ {dl_state_name} 2026 Deadlines</p>', unsafe_allow_html=True)
+        deadlines = [
+            ("Voter Registration Deadline",          "October 11, 2026",    "Register online, by mail, or in person."),
+            ("Same-Day Registration (Early Voting)",  "During early voting", "Register and vote at your early voting site."),
+            ("Early Voting Begins",                   "October 15, 2026",   "No excuse needed in NC."),
+            ("Early Voting Ends",                     "November 1, 2026",   "Last day to vote early."),
+            ("Absentee Ballot Request Deadline",      "October 29, 2026",   "Request must be received by this date."),
+        ]
+        for name, date, note in deadlines:
+            st.markdown(f"""
+            <div class="rep-card other">
+                <strong>{name}</strong><br>
+                📅 <em>{date}</em><br>
+                <span style="color:#555;font-size:0.9rem">{note}</span>
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown('<p class="section-label">🗳️ Official Resources</p>', unsafe_allow_html=True)
+        for label, url in get_official_resources(dl_state):
+            st.markdown(f"- [{label}]({url})")
+        st.caption(f"Always verify deadlines directly with {dl_state_name}'s official election authority — rules can change.")
+    else:
+        st.info(
+            f"Registration cutoffs, early-voting windows, and absentee deadlines for **{dl_state_name}** "
+            f"vary and can change year to year, so we don't guess at exact dates here — use the official "
+            f"links below to get {dl_state_name}'s current 2026 deadlines."
+        )
+        st.markdown('<p class="section-label">🗳️ Official Resources</p>', unsafe_allow_html=True)
+        for label, url in get_official_resources(dl_state):
+            st.markdown(f"- [{label}]({url})")
+        st.caption(f"Always verify deadlines directly with {dl_state_name}'s official election authority — rules can change.")
 
 # ─────────────────────────────────────────────
 # MY REPRESENTATIVES
 # ─────────────────────────────────────────────
 elif menu == "🏛️ My Representatives":
     st.header("🏛️ Who Represents You?")
-    st.caption("Shows your NC state legislators AND your federal representatives in Congress.")
-    address = st.text_input("Enter your NC address")
+    st.caption("Shows your state legislators AND your federal representatives in Congress — for any U.S. address.")
+    address = st.text_input("Enter your address", placeholder="123 Main St, Charlotte, NC 28201")
 
     if st.button("Find My Reps", type="primary"):
         if not address.strip():
             st.error("Please enter an address.")
         else:
             with st.spinner("Locating address…"):
-                lat, lng = geocode(address)
+                lat, lng, detected_state = geocode(address)
 
             if lat is None:
                 st.error("Could not locate that address. Try adding your city and zip code.")
             else:
+                state_name = STATES.get(detected_state, {}).get("name", "")
+                show_searched_address(address)
+                if state_name:
+                    st.caption(f"Detected state: **{state_name}**")
+
                 with st.spinner("Loading your representatives…"):
                     all_reps = get_reps_by_location(lat, lng)
 
@@ -789,17 +1007,21 @@ elif menu == "🏛️ My Representatives":
                     federal_reps = [r for r in all_reps if is_federal(r)]
                     state_reps   = [r for r in all_reps if is_state(r)]
 
-                    st.markdown('<p class="section-label">🏛️ Governor of North Carolina</p>', unsafe_allow_html=True)
-                    st.markdown("""
-                    <div class="rep-card democrat">
-                        <strong style="font-size:1.05rem">Josh Stein</strong>
-                        <span class="party-badge badge-democrat">Democrat</span><br>
-                        <span style="color:#555;font-size:0.88rem">Governor — North Carolina</span><br>
-                        🌐 <a href="https://governor.nc.gov" target="_blank">governor.nc.gov</a>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    # Governor card is currently only populated for North Carolina.
+                    # For other states we skip it rather than show incorrect info —
+                    # a live per-state governor lookup is a follow-up step.
+                    if detected_state == "NC":
+                        st.markdown('<p class="section-label">🏛️ Governor of North Carolina</p>', unsafe_allow_html=True)
+                        st.markdown("""
+                        <div class="rep-card democrat">
+                            <strong style="font-size:1.05rem">Josh Stein</strong>
+                            <span class="party-badge badge-democrat">Democrat</span><br>
+                            <span style="color:#555;font-size:0.88rem">Governor — North Carolina</span><br>
+                            🌐 <a href="https://governor.nc.gov" target="_blank">governor.nc.gov</a>
+                        </div>
+                        """, unsafe_allow_html=True)
 
-                    st.markdown('<p class="section-label">🇺🇸 U.S. Senate — North Carolina</p>', unsafe_allow_html=True)
+                    st.markdown(f'<p class="section-label">🇺🇸 U.S. Senate{" — " + state_name if state_name else ""}</p>', unsafe_allow_html=True)
                     us_senators = [r for r in federal_reps if (r.get("current_role") or {}).get("org_classification") == "upper"]
                     for rep in us_senators:
                         name  = rep.get("name", "Unknown")
@@ -816,7 +1038,7 @@ elif menu == "🏛️ My Representatives":
                             <div class="rep-card {css}">
                                 <strong style="font-size:1.05rem">{name}</strong>
                                 <span class="party-badge {badge}">{party}</span><br>
-                                <span style="color:#555;font-size:0.88rem">U.S. Senator — North Carolina</span><br>
+                                <span style="color:#555;font-size:0.88rem">U.S. Senator{" — " + state_name if state_name else ""}</span><br>
                                 {"📧 <a href='" + email + "' target='_blank'>Contact</a>" if email else ""}
                             </div>""", unsafe_allow_html=True)
 
@@ -842,7 +1064,7 @@ elif menu == "🏛️ My Representatives":
                                 {"📧 <a href='" + email + "' target='_blank'>Contact</a>" if email else ""}
                             </div>""", unsafe_allow_html=True)
 
-                    st.markdown('<p class="section-label">🏛️ NC Senate</p>', unsafe_allow_html=True)
+                    st.markdown(f'<p class="section-label">🏛️ {state_name or "State"} Senate</p>', unsafe_allow_html=True)
                     nc_senate = [r for r in state_reps if (r.get("current_role") or {}).get("org_classification") == "upper"]
                     for rep in nc_senate:
                         name  = rep.get("name", "Unknown")
@@ -864,7 +1086,7 @@ elif menu == "🏛️ My Representatives":
                                 {"📧 <a href='mailto:" + email + "'>" + email + "</a>" if email and not email.startswith("http") else ""}
                             </div>""", unsafe_allow_html=True)
 
-                    st.markdown('<p class="section-label">🏛️ NC House of Representatives</p>', unsafe_allow_html=True)
+                    st.markdown(f'<p class="section-label">🏛️ {state_name or "State"} House of Representatives</p>', unsafe_allow_html=True)
                     nc_house = [r for r in state_reps if (r.get("current_role") or {}).get("org_classification") == "lower"]
                     for rep in nc_house:
                         name  = rep.get("name", "Unknown")
@@ -890,14 +1112,23 @@ elif menu == "🏛️ My Representatives":
 # REP MAP — FIX #5: st.status loading
 # ─────────────────────────────────────────────
 elif menu == "🗺️ Rep Map":
-    st.header("🗺️ NC District Map")
+    st.header("🗺️ District Map")
     st.caption("Real district boundaries from the U.S. Census Bureau, colored by party. Click any district for rep details.")
 
     if st.button("🔄 Clear map cache", help="Force re-fetch boundaries from Census — use if districts look wrong"):
         st.cache_data.clear()
         st.success("Cache cleared — click Show Map to reload.")
 
-    address = st.text_input("Enter your NC address (optional — pins your location on the map)")
+    col_addr, col_state = st.columns([3, 1])
+    with col_addr:
+        address = st.text_input("Enter your address (optional — pins your location and auto-selects the state below)")
+    with col_state:
+        state_abbrs = sorted(STATES.keys())
+        manual_state = st.selectbox(
+            "State", state_abbrs,
+            index=state_abbrs.index(DEFAULT_STATE),
+            help="Auto-overridden if your address above resolves to a different state.",
+        )
 
     st.markdown("**Show district layer:**")
     col1, col2, col3, col4, col5 = st.columns(5)
@@ -908,21 +1139,29 @@ elif menu == "🗺️ Rep Map":
     with col5: show_nc_house = st.checkbox("NC House",    value=False)
 
     if st.button("Show Map", type="primary"):
-        with st.status("Loading NC district data…", expanded=True) as load_status:
+        with st.status("Loading district data…", expanded=True) as load_status:
             st.write("📡 Geocoding address…")
-            lat, lng = None, None
+            lat, lng, detected_state = None, None, None
             if address.strip():
-                lat, lng = geocode(address)
+                lat, lng, detected_state = geocode(address)
 
-            st.write("🗺️ Fetching Census district boundaries…")
-            geojson_us_house  = fetch_tiger_geojson(LAYER_US_HOUSE)  if show_us_house else {}
-            geojson_nc_senate = fetch_tiger_geojson(LAYER_NC_SENATE) if show_nc_sen   else {}
-            geojson_nc_house  = fetch_tiger_geojson(LAYER_NC_HOUSE)  if show_nc_house else {}
+            # Address-detected state wins; otherwise fall back to the manual picker.
+            state_abbr = detected_state or manual_state
+            state_info = STATES.get(state_abbr, STATES[DEFAULT_STATE])
+            state_fips = state_info["fips"]
+            state_name = state_info["name"]
+            if detected_state and detected_state != manual_state:
+                st.write(f"📍 Address resolved to **{state_name}** — using that state.")
+
+            st.write(f"🗺️ Fetching Census district boundaries for {state_name}…")
+            geojson_us_house  = fetch_tiger_geojson(LAYER_US_HOUSE, state_fips, state_abbr)     if show_us_house else {}
+            geojson_nc_senate = fetch_tiger_geojson(LAYER_STATE_SENATE, state_fips, state_abbr) if show_nc_sen   else {}
+            geojson_nc_house  = fetch_tiger_geojson(LAYER_STATE_HOUSE, state_fips, state_abbr)  if show_nc_house else {}
 
             st.write("👥 Loading representative data…")
-            nc_senate_reps, nc_senate_err = get_all_nc_reps_by_chamber("upper") if show_nc_sen   else ([], "")
-            nc_house_reps,  nc_house_err  = get_all_nc_reps_by_chamber("lower") if show_nc_house else ([], "")
-            us_house_reps  = get_nc_federal_members()             if show_us_house else []
+            nc_senate_reps, nc_senate_err = get_state_reps_by_chamber(state_abbr, "upper") if show_nc_sen   else ([], "")
+            nc_house_reps,  nc_house_err  = get_state_reps_by_chamber(state_abbr, "lower") if show_nc_house else ([], "")
+            us_house_reps  = get_federal_house_members(state_abbr)                        if show_us_house else []
 
             lookup_nc_senate = build_rep_lookup(nc_senate_reps)
             lookup_nc_house  = build_rep_lookup(nc_house_reps)
@@ -931,48 +1170,68 @@ elif menu == "🗺️ Rep Map":
 
         # Surface rep-load failures (st.warning not allowed inside cached functions)
         if show_nc_sen and not nc_senate_reps:
-            st.warning("⚠️ Could not load NC Senate representatives. Boundaries will show without rep names.")
+            st.warning(f"⚠️ Could not load {state_name} Senate representatives. Boundaries will show without rep names.")
         if show_nc_house and not nc_house_reps:
-            st.warning("⚠️ Could not load NC House representatives. Boundaries will show without rep names.")
+            st.warning(f"⚠️ Could not load {state_name} House representatives. Boundaries will show without rep names.")
         if show_us_house and not us_house_reps:
             st.warning("⚠️ Could not load U.S. House representatives. Boundaries will show without rep names.")
 
-        center = [lat, lng] if lat else [35.5, -79.5]
-        zoom   = 11 if lat else 7
+        show_searched_address(address)
+
+        if lat:
+            center, zoom = [lat, lng], 11
+        else:
+            # No address given — center on the selected state instead of always NC.
+            fallback_lat, fallback_lng, _ = geocode(f"{state_name}, USA")
+            center = [fallback_lat, fallback_lng] if fallback_lat else [35.5, -79.5]
+            zoom = 7
         m = folium.Map(location=center, zoom_start=zoom, tiles="CartoDB positron")
 
-        # Fetch NC state outline once and reuse for both Governor and US Senate overlays.
+        # Fetch the selected state's outline once and reuse for both Governor and US Senate overlays.
         # Using a stable GitHub-hosted GeoJSON instead of the shifting TIGERweb State_County layer.
-        nc_state_geo = None
+        state_outline_geo = None
         if show_gov or show_us_sen:
             try:
-                all_states = requests.get(NC_STATE_GEOJSON_URL, timeout=15).json()
-                nc_feature = next(
-                    (f for f in all_states.get("features", [])
-                     if f.get("properties", {}).get("name") == "North Carolina"),
+                all_states_geo = requests.get(US_STATES_GEOJSON_URL, timeout=15).json()
+                state_feature = next(
+                    (f for f in all_states_geo.get("features", [])
+                     if f.get("properties", {}).get("name") == state_name),
                     None
                 )
-                if nc_feature:
-                    nc_state_geo = {"type": "FeatureCollection", "features": [nc_feature]}
+                if state_feature:
+                    state_outline_geo = {"type": "FeatureCollection", "features": [state_feature]}
             except Exception:
                 pass
 
+        # NOTE: Governor and U.S. Senate names/parties below are only populated for
+        # North Carolina. For other states we still draw the outline layer but skip
+        # the name/party popup rather than show incorrect information — live
+        # per-state governor/senator lookups are a follow-up step.
         if show_gov:
             try:
                 gov_fg = folium.FeatureGroup(name="Governor", show=True)
-                popup_html = """
-                <div style="font-family:sans-serif;min-width:200px">
-                    <strong>Josh Stein</strong><br>
-                    <em style="color:#555">Governor of North Carolina</em><br>
-                    <span style="color:#1a73e8;font-weight:600">Democrat</span><br>
-                    <a href="https://governor.nc.gov" target="_blank">governor.nc.gov</a>
-                </div>"""
-                for feature in (nc_state_geo or {}).get("features", []):
+                if state_abbr == "NC":
+                    popup_html = """
+                    <div style="font-family:sans-serif;min-width:200px">
+                        <strong>Josh Stein</strong><br>
+                        <em style="color:#555">Governor of North Carolina</em><br>
+                        <span style="color:#1a73e8;font-weight:600">Democrat</span><br>
+                        <a href="https://governor.nc.gov" target="_blank">governor.nc.gov</a>
+                    </div>"""
+                    tooltip = "Governor: Josh Stein (Democrat)"
+                else:
+                    popup_html = f"""
+                    <div style="font-family:sans-serif;min-width:200px">
+                        <strong>Governor of {state_name}</strong><br>
+                        <span style="color:#888;font-size:0.85rem">Name/party lookup for this state coming soon.</span>
+                    </div>"""
+                    tooltip = f"Governor of {state_name}"
+                for feature in (state_outline_geo or {}).get("features", []):
                     folium.GeoJson(
                         feature,
                         style_function=lambda f: {"fillColor": "#1a73e8", "fillOpacity": 0.08, "color": "#1a73e8", "weight": 2, "dashArray": "6 4"},
                         highlight_function=lambda f: {"fillColor": "#1a73e8", "fillOpacity": 0.20, "color": "#1a73e8", "weight": 2, "dashArray": "6 4"},
-                        tooltip="Governor: Josh Stein (Democrat)",
+                        tooltip=tooltip,
                         popup=folium.Popup(popup_html, max_width=260),
                     ).add_to(gov_fg)
                 gov_fg.add_to(m)
@@ -982,22 +1241,31 @@ elif menu == "🗺️ Rep Map":
         if show_us_sen:
             try:
                 sen_fg = folium.FeatureGroup(name="U.S. Senate", show=True)
-                popup_html = """
-                <div style="font-family:sans-serif;min-width:210px">
-                    <strong>NC U.S. Senators</strong><br><br>
-                    <img src='https://unitedstates.github.io/images/congress/450x550/T000476.jpg' width='45' style='border-radius:50%;margin-right:6px'/>
-                    <strong>Thom Tillis</strong> <span style="color:#c0392b">Republican</span><br>
-                    <a href="https://www.tillis.senate.gov" target="_blank">tillis.senate.gov</a><br><br>
-                    <img src='https://unitedstates.github.io/images/congress/450x550/B001305.jpg' width='45' style='border-radius:50%;margin-right:6px'/>
-                    <strong>Ted Budd</strong> <span style="color:#c0392b">Republican</span><br>
-                    <a href="https://www.budd.senate.gov" target="_blank">budd.senate.gov</a>
-                </div>"""
-                for feature in (nc_state_geo or {}).get("features", []):
+                if state_abbr == "NC":
+                    popup_html = """
+                    <div style="font-family:sans-serif;min-width:210px">
+                        <strong>NC U.S. Senators</strong><br><br>
+                        <img src='https://unitedstates.github.io/images/congress/450x550/T000476.jpg' width='45' style='border-radius:50%;margin-right:6px'/>
+                        <strong>Thom Tillis</strong> <span style="color:#c0392b">Republican</span><br>
+                        <a href="https://www.tillis.senate.gov" target="_blank">tillis.senate.gov</a><br><br>
+                        <img src='https://unitedstates.github.io/images/congress/450x550/B001305.jpg' width='45' style='border-radius:50%;margin-right:6px'/>
+                        <strong>Ted Budd</strong> <span style="color:#c0392b">Republican</span><br>
+                        <a href="https://www.budd.senate.gov" target="_blank">budd.senate.gov</a>
+                    </div>"""
+                    tooltip = "U.S. Senators: Tillis & Budd (Republican)"
+                else:
+                    popup_html = f"""
+                    <div style="font-family:sans-serif;min-width:210px">
+                        <strong>{state_name} U.S. Senators</strong><br>
+                        <span style="color:#888;font-size:0.85rem">Name/party lookup for this state coming soon.</span>
+                    </div>"""
+                    tooltip = f"U.S. Senators for {state_name}"
+                for feature in (state_outline_geo or {}).get("features", []):
                     folium.GeoJson(
                         feature,
                         style_function=lambda f: {"fillColor": "#c0392b", "fillOpacity": 0.08, "color": "#c0392b", "weight": 2, "dashArray": "6 4"},
                         highlight_function=lambda f: {"fillColor": "#c0392b", "fillOpacity": 0.20, "color": "#c0392b", "weight": 2, "dashArray": "6 4"},
-                        tooltip="U.S. Senators: Tillis & Budd (Republican)",
+                        tooltip=tooltip,
                         popup=folium.Popup(popup_html, max_width=260),
                     ).add_to(sen_fg)
                 sen_fg.add_to(m)
@@ -1034,22 +1302,26 @@ elif menu == "🗺️ Rep Map":
 # BILL TRACKER
 # ─────────────────────────────────────────────
 elif menu == "📋 Bill Tracker":
-    st.header("📋 NC Bill Tracker")
-    st.caption("Browse and search active North Carolina legislation · Via OpenStates · Updated every 30 min")
+    st.header("📋 State Bill Tracker")
+    st.caption("Browse and search active state legislation for any state · Via OpenStates · Updated every 30 min")
 
-    col1, col2 = st.columns([3, 1])
+    col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
         query = st.text_input("Search by keyword", placeholder="e.g. school funding, gun safety, Medicaid")
     with col2:
         chamber = st.selectbox("Chamber", ["All", "House", "Senate"])
+    with col3:
+        bill_state_abbrs = sorted(STATES.keys())
+        bill_state = st.selectbox("State", bill_state_abbrs, index=bill_state_abbrs.index(DEFAULT_STATE), key="bill_state")
 
     search_clicked = st.button("Search Bills", type="primary")
 
     if "bills" not in st.session_state or search_clicked:
-        load_query   = query   if search_clicked else ""
-        load_chamber = chamber if search_clicked else "All"
+        load_query   = query      if search_clicked else ""
+        load_chamber = chamber    if search_clicked else "All"
+        load_state   = bill_state if search_clicked else DEFAULT_STATE
         with st.spinner("Loading bills…"):
-            bills_result, bills_err = get_nc_bills(query=load_query, chamber=load_chamber)
+            bills_result, bills_err = get_state_bills(load_state, query=load_query, chamber=load_chamber)
             st.session_state.bills     = bills_result
             st.session_state.bills_err = bills_err
 
@@ -1115,8 +1387,8 @@ elif menu == "🔍 District Compare":
             st.error("Please enter both addresses.")
         else:
             with st.spinner("Looking up representatives for both addresses…"):
-                lat1, lng1 = geocode(addr1)
-                lat2, lng2 = geocode(addr2)
+                lat1, lng1, state1 = geocode(addr1)
+                lat2, lng2, state2 = geocode(addr2)
                 reps1 = get_reps_by_location(lat1, lng1) if lat1 else []
                 reps2 = get_reps_by_location(lat2, lng2) if lat2 else []
 
@@ -1152,6 +1424,8 @@ elif menu == "🔍 District Compare":
                 left_col, right_col = st.columns(2)
                 with left_col:
                     st.subheader(f"📍 {addr1[:45]}{'…' if len(addr1) > 45 else ''}")
+                    if state1 and state1 in STATES:
+                        st.caption(STATES[state1]["name"])
                     if reps1:
                         for rep in sort_reps(reps1):
                             st.markdown(rep_card_compare(rep, rep.get("id") in shared_ids), unsafe_allow_html=True)
@@ -1159,6 +1433,8 @@ elif menu == "🔍 District Compare":
                         st.warning("No representatives found.")
                 with right_col:
                     st.subheader(f"📍 {addr2[:45]}{'…' if len(addr2) > 45 else ''}")
+                    if state2 and state2 in STATES:
+                        st.caption(STATES[state2]["name"])
                     if reps2:
                         for rep in sort_reps(reps2):
                             st.markdown(rep_card_compare(rep, rep.get("id") in shared_ids), unsafe_allow_html=True)
