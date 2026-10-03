@@ -1,4 +1,6 @@
-streamlit
-requests
-folium
-streamlit-folium
+# Exact versions the app and tests were verified with. Upgrade deliberately: change a
+# version, run the tests, then commit.
+streamlit==1.58.0
+requests==2.34.2
+folium==0.20.0
+streamlit-folium==0.27.2

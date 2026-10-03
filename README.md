@@ -1,5 +1,7 @@
 # CivicLens
 
+[![Tests](https://github.com/adi-kai/CivicLens/actions/workflows/tests.yml/badge.svg)](https://github.com/adi-kai/CivicLens/actions/workflows/tests.yml)
+
 **A nonpartisan civic education tool for voters in all 50 states and D.C.**
 
 CivicLens helps first-time and returning voters find their representatives, track legislation, research candidates, and navigate the voting process — all in one place. Enter an address and the app detects your state automatically.
@@ -20,7 +22,7 @@ Built for the 2026 election cycle.
 | 🔍 **District Compare** | Compare representatives for two addresses side by side — same state or different states |
 | 🗳️ **Candidates** | AI-assisted research on 2026 races in any state, with policy positions from public sources |
 
-The sidebar also has a **color theme** picker (six light themes and a dark one). Your choice is remembered in the page URL — no cookies or accounts.
+Type your address once — it carries over as you move between sections. The sidebar also has a **color theme** picker (six light themes and a dark one). Your choice is remembered in the page URL — no cookies or accounts.
 
 ---
 
@@ -84,13 +86,14 @@ Run from the project folder — Streamlit reads `secrets.toml` and the theme con
 streamlit run civiclens_app.py
 ```
 
-### 5. Run the render check
+### 5. Run the tests
 
 ```bash
-python tests/smoke_test.py
+python -m unittest discover -s tests -v   # unit tests for the matching, labeling, and HTML-safety logic
+python tests/smoke_test.py                # render check for every section
 ```
 
-This opens every section with all network calls replaced by canned data, so it needs no API keys or internet, and fails if anything crashes or is missing.
+Neither needs API keys or internet. The render check opens every section with all network calls replaced by canned data and fails if anything crashes, is missing, or shows up that shouldn't (like a script tag in AI output). GitHub Actions runs both on every push.
 
 ---
 
@@ -120,7 +123,10 @@ civiclens/
   data/                 # one module per outside service, all cached
     geocode.py  civic.py  openstates.py  congress.py  governors.py  tiger.py  ai.py
   tabs/                 # one module per sidebar section, each with render()
-tests/smoke_test.py     # render check for every section
+tests/
+  test_logic.py         # unit tests
+  smoke_test.py         # render check for every section
+.github/workflows/      # runs both test suites on every push
 privacy-policy.html
 terms-of-service.html
 ```
@@ -136,6 +142,14 @@ terms-of-service.html
 - **TIGERweb resilience** — district boundary fetching tries multiple field-name variants (`STATE='37'`, `STUSPS='NC'`) to handle Census API schema changes across years.
 - **Federal rep data** — OpenStates' per-state rosters list state legislators only, so the Rep Map's U.S. House and Senate data come from the public-domain `unitedstates/congress-legislators` dataset.
 - **Deadlines** — exact dates are shown only where they've been verified against the official source (currently North Carolina). Other states get links to official resources rather than guessed dates.
+- **HTML safety** — names, bill titles, and addresses are escaped before they're placed in HTML, and AI-generated candidate cards have script tags, event handlers, and `javascript:` links stripped, since the AI's input includes web search results.
+
+---
+
+## Known Limitations
+
+- District-to-representative matching on the Rep Map is number-based. States with lettered or named legislative districts (e.g. Alaska's State Senate, some New England House districts) may show districts as "No data" or match them incorrectly.
+- Exact voting deadlines are only listed for North Carolina.
 
 ---
 
