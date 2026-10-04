@@ -5,6 +5,8 @@ import time
 
 import streamlit as st
 
+from civiclens.i18n import t
+
 def esc(value) -> str:
     """Escapes text from users or APIs before it goes into HTML, so a name with "&" or "<"
     displays as written and can't add its own tags. Also safe inside quoted attributes."""
@@ -94,7 +96,7 @@ def show_searched_address(address: str):
     if address and address.strip():
         st.markdown(f"""
         <div class="info-box" style="padding:0.55rem 1rem;margin:0 0 0.9rem 0;">
-            📍 <strong>Address:</strong> {esc(address)}
+            📍 <strong>{t("Address:")}</strong> {esc(address)}
         </div>
         """, unsafe_allow_html=True)
 
@@ -121,11 +123,15 @@ def get_chamber_label(rep: dict) -> str:
     if is_federal(rep):
         if org == "upper":
             state_name = dist or (rep.get("jurisdiction", {}) or {}).get("name", "")
-            return f"U.S. Senator — {state_name}" if state_name else "U.S. Senator"
-        return f"U.S. House — District {dist}"
+            return t("U.S. Senator — {state}", state=t(state_name)) if state_name else t("U.S. Senator")
+        return t("U.S. House — District {district}", district=dist)
     if is_state(rep):
         title = state_legislator_title(title, (rep.get("jurisdiction") or {}).get("name", ""))
-    return f"{title} — District {dist}"
+    return t("{title} — District {district}", title=t(title), district=dist)
+
+def party_label(party: str) -> str:
+    """Party name for display. Styling helpers keep using the English name."""
+    return t(party or "Unknown")
 
 def build_rep_lookup(reps: list) -> dict:
     lookup = {}

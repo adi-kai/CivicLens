@@ -86,9 +86,15 @@ class FakeResponse:
         return self._payload
 
 
+PROMPTS = []   # every AI prompt sent, so tests can check what was asked for
+
+
 def fake_get(url, params=None, **kwargs):
     params = params or {}
     if "nominatim" in url:
+        if ", SC" in params.get("q", ""):
+            return FakeResponse([{"lat": "34.00", "lon": "-81.03",
+                                  "address": {"ISO3166-2-lvl4": "US-SC", "state": "South Carolina"}}])
         return FakeResponse([{"lat": "35.22", "lon": "-80.84",
                               "address": {"ISO3166-2-lvl4": "US-NC", "state": "North Carolina"}}])
     if "civicinfo/v2/elections" in url:
@@ -125,6 +131,7 @@ def fake_get(url, params=None, **kwargs):
 
 def fake_post(url, params=None, json=None, **kwargs):
     if "generativelanguage" in url:
+        PROMPTS.append(json["contents"][0]["parts"][0]["text"])
         is_summary = "Summarize" in json["contents"][0]["parts"][0]["text"]
         text = "This bill funds schools." if is_summary else CANDIDATE_HTML
         return FakeResponse({"candidates": [{"content": {"parts": [{"text": text}]}}]})
@@ -136,8 +143,10 @@ def fake_post(url, params=None, json=None, **kwargs):
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
-def new_app():
+def new_app(lang="en"):
     at = AppTest.from_file(APP, default_timeout=60)
+    if lang != "en":
+        at.query_params["lang"] = lang
     at.secrets["google"] = {"api_key": "test"}
     at.secrets["openstates"] = {"api_key": "test"}
     at.secrets["gemini"] = {"api_key": "test"}
@@ -172,7 +181,11 @@ def button(at, label):
 
 
 def go(at, section):
-    return at.sidebar.radio[0].set_value(section).run()
+    # AppTest matches radio options by their displayed label, which is translated in Spanish
+    from civiclens.i18n import ES
+    radio = at.sidebar.radio[0]
+    label = section if section in radio.options else ES[section]
+    return radio.set_value(label).run()
 
 
 # ── Sections ─────────────────────────────────────────────────────────────────
@@ -236,12 +249,78 @@ def candidates(at):
     button(at, "Find Candidates & Positions").click().run()
     return ["Candidate A", "ncsbe.gov"], ["<script", "onclick", "javascript:"]
 
+def deadlines_sc(at):
+    # A researched state other than NC; its in-person registration deadline (Oct 2) has passed
+    go(at, "📅 Deadlines")
+    at.text_input(key="address").input("1101 Main St, Columbia, SC 29201").run()
+    return ["Voter Registration Deadline — Online, Fax, or Email", "SC State Election Commission",
+            ">Passed<", "SC Election Commission"]
+
 def theme(at):
-    at.sidebar.selectbox[0].set_value("midnight").run()
+    next(s for s in at.sidebar.selectbox if s.label == "Color theme").set_value("midnight").run()
     return ["--cl-paper: #15112B"]
 
-SECTIONS = [home, polling, deadlines, my_reps, shared_address, rep_map, bills, compare,
-            candidates, theme]
+
+# ── Spanish ──────────────────────────────────────────────────────────────────
+# Run with ?lang=es. Navigation values are the same internal keys in both languages;
+# buttons are found by their Spanish labels.
+def es_home(at):
+    go(at, "🏠 Home")
+    return ["Te damos la bienvenida", "Tu guía completa"], ["Welcome!"]
+
+def es_deadlines(at):
+    go(at, "📅 Deadlines")
+    at.text_input(key="address").input(ADDR).run()
+    return ["Fecha límite de inscripción de votantes", "5 p. m. del viernes 9 de octubre de 2026",
+            "Junta Electoral del Estado de Carolina del Norte", "Recursos oficiales"], ["Voter Registration Deadline"]
+
+def es_my_reps(at):
+    go(at, "🏛️ My Representatives")
+    at.text_input[0].input(ADDR)
+    button(at, "Buscar mis representantes").click().run()
+    return ["Gobernador(a) de Carolina del Norte", "Senado estatal — Distrito 37", "Demócrata",
+            "Foto de Sen One", "Cámara de Representantes de EE. UU. — Distrito 12"], ["Who Represents"]
+
+def es_rep_map(at):
+    go(at, "🗺️ Rep Map")
+    at.text_input[0].input(ADDR)
+    for cb in at.checkbox:
+        cb.check()
+    button(at, "Mostrar mapa").click().run()
+    return ["¡Datos del mapa cargados!", "Partidos:"], ["Party Key"]
+
+def es_bills(at):
+    PROMPTS.clear()
+    go(at, "📋 Bill Tracker")
+    button(at, "✨ Resumen en lenguaje sencillo").click().run()
+    asked_spanish = any("plain Spanish" in p for p in PROMPTS)
+    return ["Proyectos de ley estatales", "Jay Sponsor (Demócrata) · Senado estatal",
+            "This bill funds schools."] + ([] if asked_spanish else ["<summary prompt asked for Spanish>"])
+
+def es_candidates(at):
+    PROMPTS.clear()
+    go(at, "🗳️ Candidates")
+    at.selectbox(key="cand_state").set_value("NC").run()
+    next(s for s in at.selectbox if s.label == "Selecciona la contienda").set_value("Senado de EE. UU.").run()
+    button(at, "Buscar candidatos y posturas").click().run()
+    asked_spanish = any("Write all of your text in Spanish" in p for p in PROMPTS)
+    return (["Candidate A", "Investigación asistida por IA"]
+            + ([] if asked_spanish else ["<candidate prompt asked for Spanish>"])), ["<script"]
+
+
+def switch_language(at):
+    # Start in English, type an address, switch to Spanish, then use another section
+    go(at, "📍 Polling Finder")
+    at.text_input(key="address").input(ADDR).run()
+    next(s for s in at.sidebar.selectbox if s.label == "Language / Idioma").set_value("es").run()
+    go(at, "🏛️ My Representatives")
+    button(at, "Buscar mis representantes").click().run()
+    return [f"TextInput: {ADDR}", "Senado estatal — Distrito 37"]
+
+
+SECTIONS = [home, polling, deadlines, deadlines_sc, my_reps, shared_address, rep_map, bills,
+            compare, candidates, theme, switch_language]
+SPANISH_SECTIONS = [es_home, es_deadlines, es_my_reps, es_rep_map, es_bills, es_candidates]
 
 
 def main():
@@ -250,8 +329,9 @@ def main():
     snapshot = sys.argv[sys.argv.index("--snapshot") + 1] if "--snapshot" in sys.argv else None
 
     failures, dump = [], []
-    for section in SECTIONS:
-        at = new_app()
+    runs = [(s, "en") for s in SECTIONS] + [(s, "es") for s in SPANISH_SECTIONS]
+    for section, lang in runs:
+        at = new_app(lang)
         if at.exception:
             failures.append(f"{section.__name__}: app failed to start — {at.exception[0].value}")
             continue

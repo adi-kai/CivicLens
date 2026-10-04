@@ -1,4 +1,5 @@
 """Per-state metadata: the state registry and the races each state has."""
+from civiclens.i18n import t
 
 # ── National state registry: USPS abbreviation → FIPS code + full name ───────
 # Used to parameterize every fetcher (TIGERweb, OpenStates, bills) by state,
@@ -78,26 +79,28 @@ LOWER_CHAMBER_NAMES = {
 
 def get_candidate_races(state_abbr: str) -> dict:
     """Returns {dropdown label: (race name, district word)} for a state's major races.
-    district word ("District"/"Ward") is None when the race is statewide or at-large."""
+    Labels are in the current language; race names and district words ("District"/"Ward")
+    stay English, since they go into the AI search. district word is None when the race
+    is statewide or at-large."""
     abbr = (state_abbr or DEFAULT_STATE).upper()
-    name = STATES.get(abbr, {}).get("name", abbr)
+    name = t(STATES.get(abbr, {}).get("name", abbr))
     if abbr == "DC":
         # No governor, U.S. Senators, or state legislature
         return {
-            "Mayor": ("Mayor", None),
-            "Delegate to the U.S. House": ("Delegate to the U.S. House", None),
-            "D.C. Council (enter ward below)": ("D.C. Council", "Ward"),
+            t("Mayor"): ("Mayor", None),
+            t("Delegate to the U.S. House"): ("Delegate to the U.S. House", None),
+            t("D.C. Council (enter ward below)"): ("D.C. Council", "Ward"),
         }
-    races = {"Governor": ("Governor", None), "U.S. Senate": ("U.S. Senate", None)}
+    races = {t("Governor"): ("Governor", None), t("U.S. Senate"): ("U.S. Senate", None)}
     if abbr in AT_LARGE_HOUSE_STATES:
-        races["U.S. House (at-large)"] = ("U.S. House At-Large", None)
+        races[t("U.S. House (at-large)")] = ("U.S. House At-Large", None)
     else:
-        races["U.S. House (enter district below)"] = ("U.S. House", "District")
+        races[t("U.S. House (enter district below)")] = ("U.S. House", "District")
     if abbr == "NE":
         # Nebraska's legislature is unicameral
-        races["Nebraska State Legislature (enter district below)"] = ("State Legislature", "District")
+        races[t("Nebraska State Legislature (enter district below)")] = ("State Legislature", "District")
     else:
         lower = LOWER_CHAMBER_NAMES.get(abbr, "State House")
-        races[f"{name} State Senate (enter district below)"] = ("State Senate", "District")
-        races[f"{name} {lower} (enter district below)"] = (lower, "District")
+        races[t("{state} {chamber} (enter district below)", state=name, chamber=t("State Senate"))] = ("State Senate", "District")
+        races[t("{state} {chamber} (enter district below)", state=name, chamber=t(lower))] = (lower, "District")
     return races

@@ -7,13 +7,25 @@ import streamlit as st
 
 from civiclens.config import GEMINI_KEY, GROQ_KEY, TAVILY_KEY
 
+# Every function here takes `lang` explicitly instead of reading the session: they're
+# cached, so the language has to be part of the cache key. The prompts stay in English
+# (the models follow them most reliably that way) and ask for Spanish output.
+SPANISH_OUTPUT = """
+
+IMPORTANT: Write all of your text in Spanish — including the "no 2026 election" message, the "Running against" phrase ("Compite contra"), the "Key Positions" heading ("Posturas principales"), and the "Campaign Website" link text ("Sitio web de campaña"). Translate party names (Democrat → Demócrata, Republican → Republicano). Keep people's names, URLs, and the HTML structure and inline styles exactly as specified. For state legislative offices, ROLE must still make clear the office is state-level (e.g. "Senador estatal", "Representante estatal")."""
+
+def _msg(lang: str, en: str, es: str) -> str:
+    return es if lang == "es" else en
+
 @st.cache_data(ttl=3600, show_spinner=False)
-def get_bill_summary(bill_id: str, title: str, latest_action: str, state_name: str = "") -> str:
+def get_bill_summary(bill_id: str, title: str, latest_action: str, state_name: str = "",
+                     lang: str = "en") -> str:
     if not GEMINI_KEY:
-        return "⚠️ Gemini API key not set."
+        return _msg(lang, "⚠️ Gemini API key not set.", "⚠️ No se configuró la clave de API de Gemini.")
+    language = "plain Spanish" if lang == "es" else "plain English"
     prompt = f"""You are a nonpartisan civic education assistant for a voter app.
 
-Summarize this {state_name or "state"} bill in 2-3 plain English sentences that a first-time voter can understand.
+Summarize this {state_name or "state"} bill in 2-3 sentences of {language} that a first-time voter can understand.
 Be strictly factual and nonpartisan. Do not editorialize or take sides.
 
 Bill: {title}
@@ -31,7 +43,7 @@ Respond with only the summary — no intro, no labels, no markdown."""
             timeout=20,
         )
         if r.status_code != 200:
-            return f"⚠️ Gemini error {r.status_code}"
+            return _msg(lang, f"⚠️ Gemini error {r.status_code}", f"⚠️ Error de Gemini {r.status_code}")
         parts = r.json().get("candidates", [{}])[0].get("content", {}).get("parts", [])
         return "".join(p.get("text", "") for p in parts).strip()
     except Exception as e:
@@ -39,9 +51,9 @@ Respond with only the summary — no intro, no labels, no markdown."""
 
 # ── Candidates — Gemini 2.5 Flash with Google Search grounding ───────────────
 @st.cache_data(ttl=3600, show_spinner=False)
-def get_candidate_info(race: str, state_name: str) -> str:
+def get_candidate_info(race: str, state_name: str, lang: str = "en") -> str:
     if not GEMINI_KEY:
-        return candidate_info_fallback(race, state_name)
+        return candidate_info_fallback(race, state_name, lang)
 
     prompt = f"""You are a nonpartisan civic information assistant for CivicLens, a voter education app.
 
@@ -79,6 +91,8 @@ Color guide:
 For state legislative offices, ROLE must start with the word "State" (e.g. "State Senator", "State Representative", "State Assembly Member", "State Delegate") so they aren't confused with members of Congress.
 
 Be strictly factual and nonpartisan. List ALL major-party candidates."""
+    if lang == "es":
+        prompt += SPANISH_OUTPUT
 
     try:
         for attempt in range(2):
@@ -111,10 +125,14 @@ Be strictly factual and nonpartisan. List ALL major-party candidates."""
     except Exception:
         return None  # the tab switches to the Groq + Tavily fallback
 
-def candidate_info_fallback(race: str, state_name: str) -> str:
+def candidate_info_fallback(race: str, state_name: str, lang: str = "en") -> str:
     """Groq (GPT-OSS 120B) + Tavily search — runs when Gemini is down."""
     if not GROQ_KEY or not TAVILY_KEY:
-        return '<p style="color:#c0392b;">⚠️ Gemini is currently overloaded and no fallback keys are configured. Please try again in a minute.</p>'
+        return '<p style="color:#c0392b;">' + _msg(
+            lang,
+            "⚠️ Gemini is currently overloaded and no fallback keys are configured. Please try again in a minute.",
+            "⚠️ Gemini está saturado en este momento y no hay claves de respaldo configuradas. Inténtalo de nuevo en un minuto.",
+        ) + "</p>"
 
     # Step 1 — Tavily search for live candidate data
     try:
@@ -153,7 +171,9 @@ def candidate_info_fallback(race: str, state_name: str) -> str:
             search_context += f"\n\nSource: {result.get('title')}\n{result.get('content', '')}"
 
     except Exception as e:
-        return f'<p style="color:#c0392b;">⚠️ Search unavailable: {e}. Please try again.</p>'
+        return '<p style="color:#c0392b;">' + _msg(
+            lang, f"⚠️ Search unavailable: {e}. Please try again.",
+            f"⚠️ La búsqueda no está disponible: {e}. Inténtalo de nuevo.") + "</p>"
 
     # Step 2 — Groq summarizes the search results
     prompt = f"""Based on the search results below, find all major candidates running in the 2026 {state_name} {race} election.
@@ -195,6 +215,8 @@ Color guide:
 For state legislative offices, ROLE must start with the word "State" (e.g. "State Senator", "State Representative", "State Assembly Member", "State Delegate") so they aren't confused with members of Congress.
 
 Be strictly factual and nonpartisan."""
+    if lang == "es":
+        prompt += SPANISH_OUTPUT
     try:
         groq_r = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -225,7 +247,11 @@ Be strictly factual and nonpartisan."""
 
         label = ('<p style="font-family:sans-serif; font-size:0.85rem; color:#8a6d00; background:#fff8e1; '
                  'border-radius:6px; padding:6px 10px; margin-bottom:0.75rem;">'
-                 '⚠️ AI-generated from web search. May be incomplete.</p>')
+                 + _msg(lang, "⚠️ AI-generated from web search. May be incomplete.",
+                        "⚠️ Generado por IA a partir de una búsqueda web. Puede estar incompleto.")
+                 + '</p>')
         return label + html
     except Exception as e:
-        return f'<p style="color:#c0392b;">⚠️ Backup also failed: {e}. Please try again in a minute.</p>'
+        return '<p style="color:#c0392b;">' + _msg(
+            lang, f"⚠️ Backup also failed: {e}. Please try again in a minute.",
+            f"⚠️ El respaldo también falló: {e}. Inténtalo de nuevo en un minuto.") + "</p>"

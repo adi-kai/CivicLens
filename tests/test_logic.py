@@ -146,5 +146,84 @@ class HtmlSafety(unittest.TestCase):
                          "background:var(--cl-card); color:var(--cl-muted)")
 
 
+class Spanish(unittest.TestCase):
+    """Every t("...") literal needs a Spanish entry with the same {placeholders} —
+    a missing one silently shows English, a mismatched one crashes the page."""
+
+    @staticmethod
+    def literal_keys():
+        import ast
+        import glob
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        paths = glob.glob(os.path.join(root, "civiclens", "**", "*.py"), recursive=True)
+        paths.append(os.path.join(root, "civiclens_app.py"))
+        keys = set()
+        for path in paths:
+            with open(path, encoding="utf-8") as f:
+                tree = ast.parse(f.read())
+            for node in ast.walk(tree):
+                if (isinstance(node, ast.Call) and getattr(node.func, "id", None) == "t" and node.args
+                        and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str)):
+                    keys.add(node.args[0].value)
+        return keys
+
+    def test_every_literal_has_spanish(self):
+        from civiclens.i18n import ES
+        missing = sorted(k for k in self.literal_keys() if k not in ES)
+        self.assertEqual(missing, [])
+
+    def test_data_driven_labels_have_spanish(self):
+        from civiclens.data.civic import STATE_OFFICIAL_LINKS
+        from civiclens.deadline_data import STATE_DEADLINES
+        from civiclens.i18n import ES
+        from civiclens.states import STATES
+        labels = [s["name"] for s in STATES.values()]
+        for data in STATE_DEADLINES.values():
+            labels += [data["source"]] + [item["name"] for item in data["items"]]
+        for _, links in STATE_OFFICIAL_LINKS.values():
+            labels += [label for label, _ in links]
+        self.assertEqual(sorted(set(label for label in labels if label not in ES)), [])
+
+    def test_placeholders_match(self):
+        import string
+        from civiclens.i18n import ES
+        fields = lambda s: sorted(f for _, f, _, _ in string.Formatter().parse(s) if f)
+        bad = [k for k, v in ES.items() if fields(k) != fields(v)]
+        self.assertEqual(bad, [])
+
+    def test_dates(self):
+        import streamlit as st
+        from civiclens.i18n import format_date, format_range
+        st.session_state["lang"] = "es"
+        try:
+            self.assertEqual(format_date("2026-10-09", "5 p.m."), "5 p. m. del viernes 9 de octubre de 2026")
+            self.assertEqual(format_range("2026-10-15", "2026-10-31"), "15 de octubre – 31 de octubre de 2026")
+        finally:
+            st.session_state["lang"] = "en"
+        self.assertEqual(format_date("2026-10-09", "5 p.m."), "5 p.m. Friday, October 9, 2026")
+        self.assertEqual(format_range("2026-09-18", "2026-10-31"), "September 18 – October 31, 2026")
+
+
+class DeadlineData(unittest.TestCase):
+    def test_items_are_well_formed(self):
+        import datetime
+        from civiclens.deadline_data import STATE_DEADLINES
+        election = datetime.date(2026, 11, 3)
+        for abbr, data in STATE_DEADLINES.items():
+            datetime.date.fromisoformat(data["verified"])
+            for item in data["items"]:
+                where = f"{abbr}: {item['name']}"
+                self.assertTrue(item["url"].startswith("https://"), where)
+                self.assertTrue(item["note"]["en"] and item["note"]["es"], where)
+                if "date" in item:
+                    days = [datetime.date.fromisoformat(item["date"])]
+                else:
+                    days = [datetime.date.fromisoformat(item["start"]), datetime.date.fromisoformat(item["end"])]
+                    self.assertLessEqual(days[0], days[1], where)
+                # Every 2026 general election deadline falls between September and a few days after Election Day
+                for day in days:
+                    self.assertTrue(datetime.date(2026, 9, 1) <= day <= election + datetime.timedelta(days=7), where)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -3,30 +3,31 @@ import streamlit as st
 
 from civiclens.data.ai import get_bill_summary
 from civiclens.data.openstates import get_state_bills
-from civiclens.helpers import esc, html_block, party_css, state_legislator_title
+from civiclens.helpers import esc, html_block, party_css, party_label, state_legislator_title
+from civiclens.i18n import current_lang, label_func, t
 from civiclens.states import DEFAULT_STATE, STATES
 
 
 def render():
-    st.header("📋 State Bill Tracker")
-    st.caption("Browse and search active state legislation for any state · Via OpenStates · Updated every 30 min")
+    st.header(t("📋 State Bill Tracker"))
+    st.caption(t("Browse and search active state legislation for any state · Via OpenStates · Updated every 30 min"))
 
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
-        query = st.text_input("Search by keyword", placeholder="e.g. school funding, gun safety, Medicaid")
+        query = st.text_input(t("Search by keyword"), placeholder=t("e.g. school funding, gun safety, Medicaid"))
     with col2:
-        chamber = st.selectbox("Chamber", ["All", "House", "Senate"])
+        chamber = st.selectbox(t("Chamber"), ["All", "House", "Senate"], format_func=label_func())
     with col3:
         bill_state_abbrs = sorted(STATES.keys())
-        bill_state = st.selectbox("State", bill_state_abbrs, index=bill_state_abbrs.index(DEFAULT_STATE), key="bill_state")
+        bill_state = st.selectbox(t("State"), bill_state_abbrs, index=bill_state_abbrs.index(DEFAULT_STATE), key="bill_state")
 
-    search_clicked = st.button("Search Bills", type="primary")
+    search_clicked = st.button(t("Search Bills"), type="primary")
 
     if "bills" not in st.session_state or search_clicked:
         load_query   = query      if search_clicked else ""
         load_chamber = chamber    if search_clicked else "All"
         load_state   = bill_state if search_clicked else DEFAULT_STATE
-        with st.spinner("Loading bills…"):
+        with st.spinner(t("Loading bills…")):
             bills_result, bills_err = get_state_bills(load_state, query=load_query, chamber=load_chamber)
             st.session_state.bills     = bills_result
             st.session_state.bills_err = bills_err
@@ -36,17 +37,18 @@ def render():
     bills     = st.session_state.get("bills", [])
     bills_err = st.session_state.get("bills_err", "")
     bills_state_name = STATES.get(st.session_state.get("bills_state", DEFAULT_STATE), {}).get("name", "")
+    lang = current_lang()
 
     if bills_err:
-        st.error(f"Could not load bills — {bills_err}")
+        st.error(t("Could not load bills — {err}", err=bills_err))
     elif not bills:
-        st.info("No bills found. Try a different keyword or chamber.")
+        st.info(t("No bills found. Try a different keyword or chamber."))
     else:
-        st.caption(f"Showing {len(bills)} bills — sorted by most recent activity")
+        st.caption(t("Showing {count} bills — sorted by most recent activity", count=len(bills)))
         for bill in bills:
             identifier  = bill.get("identifier", "—")
-            title       = bill.get("title", "No title")
-            latest_act  = bill.get("latest_action_description", "No recent action")
+            title       = bill.get("title", t("No title"))
+            latest_act  = bill.get("latest_action_description", t("No recent action"))
             latest_date = (bill.get("latest_action_date") or "")[:10]
             url         = bill.get("openstates_url", "#")
             bill_id     = bill.get("id", identifier)
@@ -54,13 +56,16 @@ def render():
             sponsors    = bill.get("sponsorships", [])
             primary     = next((s for s in sponsors if s.get("primary")), sponsors[0] if sponsors else None)
             sponsor_person = (primary or {}).get("person") or {}
-            sponsor_name  = (primary or {}).get("name") or sponsor_person.get("name") or "Unknown"
+            sponsor_name  = (primary or {}).get("name") or sponsor_person.get("name") or t("Unknown")
             sponsor_party = sponsor_person.get("party") or ""
             sponsor_title = state_legislator_title((sponsor_person.get("current_role") or {}).get("title", ""), bills_state_name)
             css           = party_css(sponsor_party)
             tags_html     = "".join(f'<span class="subject-tag">{esc(s)}</span>' for s in subjects)
-            sponsor_line  = (f"{sponsor_title + ' ' if sponsor_title else ''}{sponsor_name}"
-                             f"{' (' + sponsor_party + ')' if sponsor_party else ''}")
+            party_part    = f" ({party_label(sponsor_party)})" if sponsor_party else ""
+            if sponsor_title:
+                sponsor_line = t("{title} {name}{party}", title=t(sponsor_title), name=sponsor_name, party=party_part)
+            else:
+                sponsor_line = f"{sponsor_name}{party_part}"
             st.markdown(html_block(f"""
             <div class="rep-card {css}" style="padding:0.85rem 1.1rem">
                 <strong>{esc(identifier)}</strong>
@@ -71,13 +76,14 @@ def render():
                     &nbsp;·&nbsp; {esc(latest_act)}
                 </span>
                 {"<br>" + tags_html if tags_html else ""}
-                <br><a href="{esc(url)}" target="_blank" style="font-size:0.8rem;color:var(--cl-accent);">View full bill on OpenStates →</a>
+                <br><a href="{esc(url)}" target="_blank" style="font-size:0.8rem;color:var(--cl-accent);">{t("View full bill on OpenStates →")}</a>
             </div>
             """), unsafe_allow_html=True)
 
-            summary_key = f"summary_{bill_id}"
-            if st.button("✨ Plain-English Summary", key=f"btn_{bill_id}"):
-                with st.spinner("Summarizing…"):
-                    st.session_state[summary_key] = get_bill_summary(bill_id, title, latest_act, bills_state_name)
+            # Summaries are kept per language, so switching languages asks for a fresh one
+            summary_key = f"summary_{bill_id}_{lang}"
+            if st.button(t("✨ Plain-English Summary"), key=f"btn_{bill_id}"):
+                with st.spinner(t("Summarizing…")):
+                    st.session_state[summary_key] = get_bill_summary(bill_id, title, latest_act, bills_state_name, lang)
             if summary_key in st.session_state:
                 st.info(f"💡 {st.session_state[summary_key]}")
