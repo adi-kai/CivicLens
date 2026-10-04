@@ -21,12 +21,14 @@ Built for the 2026 election cycle.
 | Section | Description |
 |---|---|
 | 📍 **Polling Finder** | Look up your polling place by address via the Google Civic API, plus your state's official voting links |
-| 📅 **Deadlines** | Election Day for everyone; hand-verified 2026 registration, early-voting, and absentee dates for North Carolina; official deadline resources for every other state |
+| 📅 **Deadlines** | Election Day for everyone; hand-verified 2026 registration, early-voting, and absentee dates for North Carolina, South Carolina, Virginia, Tennessee, and Georgia, each linked to its official source and marked once it has passed; official deadline resources for every other state |
 | 🏛️ **My Representatives** | Your governor (or D.C.'s mayor), U.S. Senators, U.S. Representative, and state legislators |
 | 🗺️ **Rep Map** | Interactive district map for any state, colored by party — U.S. House, State Senate, and State House boundaries plus governor and senator overlays |
 | 📋 **Bill Tracker** | Browse and search active legislation in any state, with optional plain-English AI summaries |
 | 🔍 **District Compare** | Compare representatives for two addresses side by side — same state or different states |
 | 🗳️ **Candidates** | AI-assisted research on 2026 races in any state, with policy positions from public sources |
+
+**¿Hablas español?** The sidebar's **Language / Idioma** picker switches the whole interface to Spanish, including AI bill summaries and candidate research. (Names and bill titles from the data sources stay as published, and the legal policies are in English.)
 
 Type your address once — it carries over as you move between sections. The sidebar also has a **color theme** picker (six light themes and a dark one). Your choice is remembered in the page URL — no cookies or accounts.
 
@@ -147,7 +149,8 @@ terms-of-service.html
 - **No invented candidates** — both AI prompts tell the model to report that no 2026 election was found rather than make up candidates, and the fallback may only use facts from its search results.
 - **TIGERweb resilience** — district boundary fetching tries multiple field-name variants (`STATE='37'`, `STUSPS='NC'`) to handle Census API schema changes across years.
 - **Federal rep data** — OpenStates' per-state rosters list state legislators only, so the Rep Map's U.S. House and Senate data come from the public-domain `unitedstates/congress-legislators` dataset.
-- **Deadlines** — exact dates are shown only where they've been verified against the official source (currently North Carolina). Other states get links to official resources rather than guessed dates.
+- **Deadlines** — exact dates are shown only where each one has been verified against the state's official election website (currently NC, SC, VA, TN, and GA — see `civiclens/deadline_data.py`). Other states get links to official resources rather than guessed dates.
+- **Translation** — `t("English text")` in `civiclens/i18n.py` looks up the Spanish version, falling back to English. Unit tests fail if any string lacks a Spanish entry or a translation drops a `{placeholder}`.
 - **HTML safety** — names, bill titles, and addresses are escaped before they're placed in HTML, and AI-generated candidate cards have script tags, event handlers, and `javascript:` links stripped, since the AI's input includes web search results.
 
 ---
@@ -155,7 +158,7 @@ terms-of-service.html
 ## Known Limitations
 
 - District-to-representative matching on the Rep Map is number-based. States with lettered or named legislative districts (e.g. Alaska's State Senate, some New England House districts) may show districts as "No data" or match them incorrectly.
-- Exact voting deadlines are only listed for North Carolina.
+- Exact voting deadlines are listed for five states (NC, SC, VA, TN, GA). They must be re-verified before each election.
 
 ---
 
