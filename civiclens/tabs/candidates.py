@@ -6,11 +6,12 @@ from civiclens.helpers import html_block, rate_limit_check, sanitize_ai_html
 from civiclens.i18n import current_lang, t
 from civiclens.states import DEFAULT_STATE, STATES, get_candidate_races
 from civiclens.theme import theme_ai_html
+from civiclens.ui import page_header
 
 
 def render():
-    st.header(t("🗳️ 2026 Candidates"))
-    st.caption(t("Powered by Google Gemini 2.5 Flash + Groq + Tavily + Google Search — free, nonpartisan, live from official campaign websites"))
+    page_header(t("🗳️ 2026 Candidates"),
+                t("Powered by Google Gemini 2.5 Flash + Groq + Tavily + Google Search — free, nonpartisan, live from official campaign websites"))
 
     col_state, col_race = st.columns([1, 3])
     with col_state:

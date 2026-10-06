@@ -146,6 +146,44 @@ class HtmlSafety(unittest.TestCase):
                          "background:var(--cl-card); color:var(--cl-muted)")
 
 
+class Ballot(unittest.TestCase):
+    """parse_ballot() against the shape of a real voterinfo response (Virginia, Oct 2026)."""
+    SAMPLE = {
+        "election": {"name": "2026 General Midterm Election", "electionDay": "2026-11-03"},
+        "contests": [
+            {"type": "ballot-measure", "ballotPlacement": "27", "district": {"name": "Virginia"},
+             "referendumTitle": "Proposed Constitutional Amendment Question 1",
+             "referendumText": "Question: Should the Constitution be amended?",
+             "referendumBallotResponses": ["Yes", "No"]},
+            {"type": "General", "ballotPlacement": "2", "office": "Member, House of Representatives (4th District)",
+             "district": {"name": "04"}, "numberVotingFor": 1,
+             "candidates": [{"name": "A. Candidate", "party": "Democratic"}, {"name": "B. Candidate"}]},
+            {"type": "General", "ballotPlacement": "1", "office": "Member, United States Senate",
+             "district": {"name": "United States Of America"}, "numberVotingFor": 1,
+             "candidates": [{"name": "C. Candidate", "party": "Republican", "candidateUrl": "https://example.com"}]},
+        ],
+    }
+
+    def test_races_and_measures_split_in_ballot_order(self):
+        from civiclens.data.civic import parse_ballot
+        ballot = parse_ballot(self.SAMPLE)
+        self.assertEqual(ballot["election"], "2026 General Midterm Election")
+        self.assertEqual([r["office"] for r in ballot["races"]],
+                         ["Member, United States Senate", "Member, House of Representatives (4th District)"])
+        self.assertEqual(ballot["measures"][0]["responses"], ["Yes", "No"])
+
+    def test_missing_fields_default_cleanly(self):
+        from civiclens.data.civic import parse_ballot
+        race = parse_ballot(self.SAMPLE)["races"][1]
+        self.assertEqual(race["candidates"][1], {"name": "B. Candidate", "party": "", "url": ""})
+        self.assertEqual(parse_ballot(self.SAMPLE)["races"][0]["candidates"][0]["url"], "https://example.com")
+
+    def test_no_contests(self):
+        from civiclens.data.civic import parse_ballot
+        self.assertEqual(parse_ballot({})["races"], [])
+        self.assertEqual(parse_ballot({"error": {"message": "Election unknown"}})["measures"], [])
+
+
 class Spanish(unittest.TestCase):
     """Every t("...") literal needs a Spanish entry with the same {placeholders} —
     a missing one silently shows English, a mismatched one crashes the page."""
@@ -182,6 +220,8 @@ class Spanish(unittest.TestCase):
             labels += [data["source"]] + [item["name"] for item in data["items"]]
         for _, links in STATE_OFFICIAL_LINKS.values():
             labels += [label for label, _ in links]
+        from civiclens.tabs.home import FEATURES, TRUST
+        labels += list(FEATURES) + [text for _, title, desc in TRUST for text in (title, desc)]
         self.assertEqual(sorted(set(label for label in labels if label not in ES)), [])
 
     def test_placeholders_match(self):

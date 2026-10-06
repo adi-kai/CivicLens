@@ -100,7 +100,21 @@ def fake_get(url, params=None, **kwargs):
     if "civicinfo/v2/elections" in url:
         return FakeResponse({"elections": [{"id": "9000"}]})
     if "civicinfo/v2/voterinfo" in url:
+        if ", SC" in params.get("address", ""):
+            # A state whose ballot data isn't published yet
+            return FakeResponse({"error": {"message": "Election unknown"}}, status=400)
         return FakeResponse({
+            "election": {"id": "9000", "name": "2026 General Midterm Election", "electionDay": "2026-11-03"},
+            "contests": [
+                {"type": "General", "ballotPlacement": "1", "office": "Member, United States Senate",
+                 "district": {"name": "North Carolina"}, "numberVotingFor": 1,
+                 "candidates": [{"name": "Senate Hopeful", "party": "Democratic"},
+                                {"name": "Other Hopeful", "party": "Republican"}]},
+                {"type": "ballot-measure", "ballotPlacement": "9", "district": {"name": "North Carolina"},
+                 "referendumTitle": "Constitutional Amendment 1",
+                 "referendumText": "Should the <constitution> be amended?",
+                 "referendumBallotResponses": ["Yes", "No"]},
+            ],
             "pollingLocations": [{"address": {"locationName": "Fire Station 1", "line1": "1 Main St",
                                               "city": "Charlotte", "state": "NC", "zip": "28202"},
                                   "pollingHours": "6:30am-7:30pm"}],
@@ -193,7 +207,25 @@ ADDR = "600 E 4th St, Charlotte, NC 28202"
 
 def home(at):
     go(at, "🏠 Home")
-    return ["CivicLens"]
+    return ["CivicLens", "Your guide to voting in 2026", "Why you can trust it"]
+
+def home_card(at):
+    # A section card on Home switches sections without reloading
+    go(at, "🏠 Home")
+    at.button(key="home_📝 My Ballot").click().run()
+    return ["Every race and ballot question"]
+
+def ballot(at):
+    go(at, "📝 My Ballot")
+    at.text_input(key="address").input(ADDR).run()
+    # API text is escaped, so "<constitution>" shows as written instead of becoming a tag
+    return ["Member, United States Senate", "Senate Hopeful", "Vote for 1", "Constitutional Amendment 1",
+            "&lt;constitution&gt;", "1 race and 1 ballot question on your ballot"], ["<constitution>"]
+
+def ballot_not_published(at):
+    go(at, "📝 My Ballot")
+    at.text_input(key="address").input("1101 Main St, Columbia, SC 29201").run()
+    return ["South Carolina hasn't published its ballot data yet", "SC Election Commission"]
 
 def polling(at):
     go(at, "📍 Polling Finder")
@@ -266,7 +298,12 @@ def theme(at):
 # buttons are found by their Spanish labels.
 def es_home(at):
     go(at, "🏠 Home")
-    return ["Te damos la bienvenida", "Tu guía completa"], ["Welcome!"]
+    return ["Tu guía para votar en 2026", "Para empezar", "Por qué puedes confiar", "Mi boleta"], ["Get started"]
+
+def es_ballot(at):
+    go(at, "📝 My Ballot")
+    at.text_input(key="address").input(ADDR).run()
+    return ["Mi boleta", "Vota por 1", "Preguntas en la boleta", "Demócrata"], ["Vote for 1"]
 
 def es_deadlines(at):
     go(at, "📅 Deadlines")
@@ -318,9 +355,9 @@ def switch_language(at):
     return [f"TextInput: {ADDR}", "Senado estatal — Distrito 37"]
 
 
-SECTIONS = [home, polling, deadlines, deadlines_sc, my_reps, shared_address, rep_map, bills,
-            compare, candidates, theme, switch_language]
-SPANISH_SECTIONS = [es_home, es_deadlines, es_my_reps, es_rep_map, es_bills, es_candidates]
+SECTIONS = [home, home_card, polling, ballot, ballot_not_published, deadlines, deadlines_sc,
+            my_reps, shared_address, rep_map, bills, compare, candidates, theme, switch_language]
+SPANISH_SECTIONS = [es_home, es_ballot, es_deadlines, es_my_reps, es_rep_map, es_bills, es_candidates]
 
 
 def main():

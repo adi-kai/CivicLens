@@ -1,4 +1,8 @@
 [theme]
-# The in-app color themes (PALETTES in civiclens_app.py) restyle everything on top of
+# The in-app color themes (PALETTES in civiclens/theme.py) restyle everything on top of
 # Streamlit's light base. Pinning it keeps a visitor's OS dark mode from mixing in.
 base = "light"
+
+[client]
+# Hide Streamlit's developer menu (Deploy, rerun settings) from visitors
+toolbarMode = "minimal"

@@ -18,6 +18,7 @@ from civiclens.helpers import (address_input, build_rep_lookup, esc, get_chamber
                                show_searched_address)
 from civiclens.i18n import t
 from civiclens.states import DEFAULT_STATE, STATES
+from civiclens.ui import page_header
 
 def build_district_layer(geojson: dict, rep_lookup: dict, layer_name: str,
                          district_field: str = "") -> folium.FeatureGroup:
@@ -62,8 +63,8 @@ def build_district_layer(geojson: dict, rep_lookup: dict, layer_name: str,
 
 
 def render():
-    st.header(t("🗺️ District Map"))
-    st.caption(t("Real district boundaries from the U.S. Census Bureau, colored by party. Click any district for rep details."))
+    page_header(t("🗺️ District Map"),
+                t("Real district boundaries from the U.S. Census Bureau, colored by party. Click any district for rep details."))
 
     if st.button(t("🔄 Clear map cache"), help=t("Force re-fetch boundaries from Census — use if districts look wrong")):
         st.cache_data.clear()

@@ -6,11 +6,12 @@ from civiclens.data.openstates import get_state_bills
 from civiclens.helpers import esc, html_block, party_css, party_label, state_legislator_title
 from civiclens.i18n import current_lang, label_func, t
 from civiclens.states import DEFAULT_STATE, STATES
+from civiclens.ui import page_header
 
 
 def render():
-    st.header(t("📋 State Bill Tracker"))
-    st.caption(t("Browse and search active state legislation for any state · Via OpenStates · Updated every 30 min"))
+    page_header(t("📋 State Bill Tracker"),
+                t("Browse and search active state legislation for any state · Via OpenStates · Updated every 30 min"))
 
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:

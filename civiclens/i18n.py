@@ -72,6 +72,12 @@ def format_date(iso: str, time: str = "", weekday: bool = True) -> str:
     return f"{time} {day}" if time else day
 
 
+def month_day(iso: str) -> tuple:
+    """("Oct", 9) / ("oct", 9) — for the deadline cards' calendar tiles."""
+    d = datetime.date.fromisoformat(iso)
+    return _MONTHS[current_lang()][d.month - 1][:3], d.day
+
+
 def format_range(start: str, end: str) -> str:
     """Two ISO dates in the same year → "October 15 – October 31, 2026" /
     "15 de octubre – 31 de octubre de 2026"."""
@@ -348,6 +354,55 @@ ES = {
     "These addresses are in different states ({state1} and {state2}), so they don't share any representatives — each state has its own legislators and U.S. Senators.":
         "Estas direcciones están en estados distintos ({state1} y {state2}), así que no comparten representantes: cada estado tiene sus propios legisladores y senadores de EE. UU.",
     "These addresses have entirely separate sets of representatives.": "Estas direcciones tienen representantes completamente distintos.",
+
+    # Home and sidebar brand
+    "Nonpartisan voter guide": "Guía imparcial para votantes",
+    "Nonpartisan · All 50 states + DC · English / Español": "Imparcial · Los 50 estados y DC · English / Español",
+    "Your guide to voting in 2026": "Tu guía para votar en 2026",
+    "Type your address once and every section uses it.": "Escribe tu dirección una vez y todas las secciones la usan.",
+    "days until Election Day": "días para el Día de las Elecciones",
+    "day until Election Day": "día para el Día de las Elecciones",
+    "Election Day is today": "Hoy es el Día de las Elecciones",
+    "Get started": "Para empezar",
+    "Open →": "Abrir →",
+    "Why you can trust it": "Por qué puedes confiar",
+    "Official sources": "Fuentes oficiales",
+    "Census maps, state election offices, and the Voting Information Project — every deadline links its source.":
+        "Mapas del Censo, oficinas electorales estatales y el Voting Information Project; cada fecha límite enlaza a su fuente.",
+    "Nonpartisan": "Imparcial",
+    "No endorsements, no ads. Party labels come straight from official records.":
+        "Sin respaldos ni anuncios. Los partidos vienen directamente de los registros oficiales.",
+    "Private": "Privado",
+    "No accounts, no cookies, no tracking. Your address is never stored.":
+        "Sin cuentas, sin cookies, sin rastreo. Tu dirección nunca se guarda.",
+    "English & Español": "English y español",
+    "Switch languages anytime from the sidebar.": "Cambia de idioma cuando quieras desde la barra lateral.",
+
+    # My Ballot
+    "📝 My Ballot": "📝 Mi boleta",
+    "Every race and ballot question on your 2026 ballot, from official election data.":
+        "Cada contienda y pregunta de tu boleta de 2026, con datos electorales oficiales.",
+    "Enter your address to see what's on your ballot.": "Ingresa tu dirección para ver qué hay en tu boleta.",
+    "Looking up your ballot…": "Buscando tu boleta…",
+    "We couldn't match that address to a ballot. Try adding your city and zip code.":
+        "No pudimos encontrar una boleta para esa dirección. Intenta agregar tu ciudad y código postal.",
+    "your state": "tu estado",
+    "{state} hasn't published its ballot data yet. Election offices add official ballots state by state as Election Day gets closer — check back soon, or use the official resources below.":
+        "{state} todavía no ha publicado los datos de su boleta. Las oficinas electorales agregan las boletas oficiales estado por estado a medida que se acerca el Día de las Elecciones; vuelve pronto o usa los recursos oficiales de abajo.",
+    "1 race": "1 contienda",
+    "{n} races": "{n} contiendas",
+    "1 ballot question": "1 pregunta",
+    "{n} ballot questions": "{n} preguntas",
+    " and ": " y ",
+    "{counts} on your ballot": "{counts} en tu boleta",
+    "🏛️ Races": "🏛️ Contiendas",
+    "📜 Ballot Questions": "📜 Preguntas en la boleta",
+    "Vote for {n}": "Vota por {n}",
+    "No candidates listed.": "No hay candidatos registrados.",
+    "Full text →": "Texto completo →",
+    "🔎 Research these candidates": "🔎 Investigar a estos candidatos",
+    "Official ballot data from the Voting Information Project, via the Google Civic Information API. Race names and ballot questions appear exactly as election officials published them. Your exact ballot can vary by precinct — check your official sample ballot before you vote.":
+        "Datos oficiales de la boleta del Voting Information Project, a través de la API Google Civic Information. Los nombres de las contiendas y las preguntas aparecen tal como los publicaron las autoridades electorales (normalmente en inglés). Tu boleta exacta puede variar según tu precinto; revisa tu boleta de muestra oficial antes de votar.",
 
     # Candidates
     "🗳️ 2026 Candidates": "🗳️ Candidatos 2026",

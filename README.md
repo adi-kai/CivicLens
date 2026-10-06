@@ -8,11 +8,13 @@ CivicLens helps first-time and returning voters find their representatives, trac
 
 Built for the 2026 election cycle.
 
-| My Representatives | Rep Map |
+![CivicLens home page with an Election Day countdown and a card for each section](docs/screenshots/home.png)
+
+| My Ballot | My Representatives |
 |---|---|
-| ![Governor, U.S. Senators, and U.S. Representative for an address](docs/screenshots/my-representatives.png) | ![North Carolina's U.S. House districts colored by party](docs/screenshots/rep-map.png) |
-| **Deadlines** | **Bill Tracker** |
-| ![North Carolina 2026 voting deadlines with sources](docs/screenshots/deadlines.png) | ![Recent North Carolina bills with sponsors and subjects](docs/screenshots/bill-tracker.png) |
+| ![Official races and candidates on a Richmond, Virginia ballot](docs/screenshots/my-ballot.png) | ![Governor, U.S. Senators, and U.S. Representative for an address](docs/screenshots/my-representatives.png) |
+| **Rep Map** | **Deadlines** |
+| ![North Carolina's U.S. House districts colored by party](docs/screenshots/rep-map.png) | ![North Carolina 2026 voting deadlines on calendar tiles, with sources](docs/screenshots/deadlines.png) |
 
 ---
 
@@ -21,6 +23,7 @@ Built for the 2026 election cycle.
 | Section | Description |
 |---|---|
 | 📍 **Polling Finder** | Look up your polling place by address via the Google Civic API, plus your state's official voting links |
+| 📝 **My Ballot** | Every race (with candidates and parties) and ballot question on your ballot, from official Voting Information Project data. States appear as their election offices publish ballots; until then the page says so and links official resources |
 | 📅 **Deadlines** | Election Day for everyone; hand-verified 2026 registration, early-voting, and absentee dates for North Carolina, South Carolina, Virginia, Tennessee, and Georgia, each linked to its official source and marked once it has passed; official deadline resources for every other state |
 | 🏛️ **My Representatives** | Your governor (or D.C.'s mayor), U.S. Senators, U.S. Representative, and state legislators |
 | 🗺️ **Rep Map** | Interactive district map for any state, colored by party — U.S. House, State Senate, and State House boundaries plus governor and senator overlays |

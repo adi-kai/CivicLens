@@ -6,11 +6,12 @@ from civiclens.data.geocode import geocode
 from civiclens.helpers import address_input, esc, show_searched_address
 from civiclens.i18n import t
 from civiclens.states import STATES
+from civiclens.ui import page_header
 
 
 def render():
-    st.header(t("📍 Find Your Polling Place"))
-    st.caption(t("Works for any U.S. address — powered by the Google Civic Information API."))
+    page_header(t("📍 Find Your Polling Place"),
+                t("Works for any U.S. address — powered by the Google Civic Information API."))
     address = address_input(t("Enter your full address"))
 
     if st.button(t("Search"), type="primary"):

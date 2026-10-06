@@ -23,11 +23,53 @@ def get_active_election_id() -> str:
     return "2000"
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def get_voter_info(address: str):
-    return requests.get(
-        "https://www.googleapis.com/civicinfo/v2/voterinfo",
-        params={"address": address, "electionId": get_active_election_id(), "key": GOOGLE_KEY}
-    ).json()
+def get_voter_info(address: str) -> dict:
+    """Google's voterinfo response, or {"error": {"message": ...}} — the same shape Google
+    uses for its own errors (e.g. "Election unknown" for a state whose data isn't loaded)."""
+    try:
+        return requests.get(
+            "https://www.googleapis.com/civicinfo/v2/voterinfo",
+            params={"address": address, "electionId": get_active_election_id(), "key": GOOGLE_KEY},
+            timeout=20,
+        ).json()
+    except Exception as e:
+        return {"error": {"message": str(e)}}
+
+def parse_ballot(data: dict) -> dict:
+    """Pulls the ballot out of a voterinfo response:
+    {"election": name, "day": ISO date, "races": [...], "measures": [...]}, both lists in
+    ballot order. Google fills in contests state by state as election offices publish
+    them through the Voting Information Project, so an empty result is normal early on."""
+    def placement(contest):
+        try:
+            return int(contest.get("ballotPlacement", ""))
+        except (TypeError, ValueError):
+            return 10_000
+
+    races, measures = [], []
+    for c in sorted(data.get("contests") or [], key=placement):
+        district = (c.get("district") or {}).get("name", "")
+        if c.get("type") == "ballot-measure" or c.get("referendumTitle"):
+            measures.append({
+                "title": c.get("referendumTitle") or c.get("ballotTitle") or "",
+                "subtitle": c.get("referendumSubtitle", ""),
+                "text": c.get("referendumText", ""),
+                "responses": c.get("referendumBallotResponses") or [],
+                "url": c.get("referendumUrl", ""),
+                "district": district,
+            })
+        else:
+            races.append({
+                "office": c.get("office") or c.get("ballotTitle") or "",
+                "district": district,
+                "vote_for": c.get("numberVotingFor"),
+                "candidates": [{"name": x.get("name", ""), "party": x.get("party") or "",
+                                "url": x.get("candidateUrl", "")}
+                               for x in c.get("candidates") or []],
+            })
+    election = data.get("election") or {}
+    return {"election": election.get("name", ""), "day": election.get("electionDay", ""),
+            "races": races, "measures": measures}
 
 # ── National voting resource links ────────────────────────────────────────────
 # vote.gov publishes a stable per-state registration page at /register/{abbr}/,

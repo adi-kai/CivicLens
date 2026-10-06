@@ -9,6 +9,7 @@ from civiclens.helpers import (address_input, esc, get_chamber_label, html_block
                                show_searched_address)
 from civiclens.i18n import t
 from civiclens.states import LOWER_CHAMBER_NAMES, STATES
+from civiclens.ui import page_header
 
 
 def rep_card(name: str, party: str, label: str, photo: str = "", contact_html: str = ""):
@@ -55,8 +56,8 @@ def section_label(text: str):
 
 
 def render():
-    st.header(t("🏛️ Who Represents You?"))
-    st.caption(t("Shows your state legislators AND your federal representatives in Congress — for any U.S. address."))
+    page_header(t("🏛️ Who Represents You?"),
+                t("Shows your state legislators AND your federal representatives in Congress — for any U.S. address."))
     address = address_input(t("Enter your address"))
 
     if st.button(t("Find My Reps"), type="primary"):

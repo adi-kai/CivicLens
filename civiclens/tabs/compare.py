@@ -7,11 +7,12 @@ from civiclens.helpers import (address_input, esc, get_chamber_label, html_block
                                is_state, party_badge, party_css, party_label)
 from civiclens.i18n import t
 from civiclens.states import STATES
+from civiclens.ui import page_header
 
 
 def render():
-    st.header(t("🔍 District Comparison"))
-    st.caption(t("Enter any two U.S. addresses — in the same state or different states — to compare their representatives side by side. Shared reps are highlighted in green."))
+    page_header(t("🔍 District Comparison"),
+                t("Enter any two U.S. addresses — in the same state or different states — to compare their representatives side by side. Shared reps are highlighted in green."))
 
     col1, col2 = st.columns(2)
     with col1:
