@@ -9,6 +9,22 @@ from civiclens.states import DEFAULT_STATE, STATES
 from civiclens.ui import page_header
 
 
+def bill_abstract(bill: dict) -> str:
+    """The first non-empty official abstract, or "" (some states, e.g. NC, publish none)."""
+    return next((a["abstract"].strip() for a in bill.get("abstracts") or []
+                 if (a.get("abstract") or "").strip()), "")
+
+
+def primary_sponsor(bill: dict) -> tuple:
+    """(name, party, title) of the primary sponsor, falling back to the first sponsor.
+    Party and title live on sponsorship["person"]; name and title can be empty."""
+    sponsors = bill.get("sponsorships") or []
+    primary = next((s for s in sponsors if s.get("primary")), sponsors[0] if sponsors else None)
+    person = (primary or {}).get("person") or {}
+    name = (primary or {}).get("name") or person.get("name") or ""
+    return name, person.get("party") or "", (person.get("current_role") or {}).get("title", "")
+
+
 def render():
     page_header(t("📋 State Bill Tracker"),
                 t("Browse and search active state legislation for any state · Via OpenStates · Updated every 30 min"))
@@ -53,15 +69,11 @@ def render():
             latest_date = (bill.get("latest_action_date") or "")[:10]
             url         = bill.get("openstates_url", "#")
             bill_id     = bill.get("id", identifier)
-            abstract    = next((a.get("abstract", "").strip() for a in bill.get("abstracts") or []
-                                if (a.get("abstract") or "").strip()), "")
+            abstract    = bill_abstract(bill)
             subjects    = (bill.get("subject") or [])[:3]
-            sponsors    = bill.get("sponsorships", [])
-            primary     = next((s for s in sponsors if s.get("primary")), sponsors[0] if sponsors else None)
-            sponsor_person = (primary or {}).get("person") or {}
-            sponsor_name  = (primary or {}).get("name") or sponsor_person.get("name") or t("Unknown")
-            sponsor_party = sponsor_person.get("party") or ""
-            sponsor_title = state_legislator_title((sponsor_person.get("current_role") or {}).get("title", ""), bills_state_name)
+            sponsor_name, sponsor_party, sponsor_title = primary_sponsor(bill)
+            sponsor_name  = sponsor_name or t("Unknown")
+            sponsor_title = state_legislator_title(sponsor_title, bills_state_name)
             css           = party_css(sponsor_party)
             tags_html     = "".join(f'<span class="subject-tag">{esc(s)}</span>' for s in subjects)
             party_part    = f" ({party_label(sponsor_party)})" if sponsor_party else ""

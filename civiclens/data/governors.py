@@ -114,10 +114,14 @@ def _fetch_governors_cached() -> dict:
         # rows, so collapse them back into a single record.
         latest = max(row["start"] for row in rows)
         current = [row for row in rows if row["start"] == latest]
+        # Two people with the same start date (e.g. an acting governor) would otherwise
+        # be merged into one card; keep one, the same one every time
+        name = min(row["name"] for row in current)
+        current = [row for row in current if row["name"] == name]
         def first_of(key: str) -> str:
             return next((row[key] for row in current if row[key]), "")
         governors[abbr] = {
-            "name":      current[0]["name"],
+            "name":      name,
             "party":     normalize_party(first_of("party")),
             "office":    "Mayor" if abbr == "DC" else "Governor",
             "start":     latest,

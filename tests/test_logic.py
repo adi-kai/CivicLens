@@ -5,10 +5,9 @@ Run from the project root:
     python -m unittest discover -s tests -v
 """
 import os
-import sys
 import unittest
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import support  # noqa: F401  (fake API keys; must come before civiclens imports)
 
 from civiclens.data.governors import commons_thumb, normalize_party  # noqa: E402
 from civiclens.data.tiger import extract_district_key  # noqa: E402
@@ -78,7 +77,7 @@ class Labels(unittest.TestCase):
 
     def test_chamber_label_us_house(self):
         house = rep("NC-14", org="lower", jur_class="country", jur_name="North Carolina")
-        self.assertEqual(get_chamber_label(house), "U.S. House — District NC-14")
+        self.assertEqual(get_chamber_label(house), "U.S. House — District 14")
 
 
 class Parties(unittest.TestCase):
@@ -266,48 +265,213 @@ class DeadlineData(unittest.TestCase):
 
 
 
-class AiFallback(unittest.TestCase):
-    """Bill summaries fall back from Gemini to Groq, and a failed call isn't cached."""
 
+class HouseLabels(unittest.TestCase):
+    """U.S. House labels show the district number, not the raw "NC-14" / "WY-0" code."""
+
+    def house(self, district):
+        return rep(district, org="lower", jur_class="country", jur_name="Wyoming")
+
+    def test_state_prefix_and_leading_zeros_dropped(self):
+        self.assertEqual(get_chamber_label(self.house("014")), "U.S. House — District 14")
+
+    def test_at_large_seat(self):
+        for district in ("WY-0", "0", "00", "AL", "At-Large"):
+            self.assertEqual(get_chamber_label(self.house(district)), "U.S. House At-Large", district)
+
+
+class PartyHelpers(unittest.TestCase):
+    def test_missing_party_does_not_crash(self):
+        from civiclens.helpers import party_badge, party_color, party_fill, party_label
+        self.assertEqual(party_css(None), "other")
+        self.assertEqual(party_badge(None), "badge-other")
+        self.assertEqual(party_color(None), "#7f8c8d")
+        self.assertEqual(party_fill(None), ("#888888", 0.15))
+        self.assertEqual(party_label(None), "Unknown")
+
+    def test_colors_and_badges(self):
+        from civiclens.helpers import party_badge, party_color, party_fill
+        self.assertEqual(party_color("Democratic-Farmer-Labor"), "#1a73e8")
+        self.assertEqual(party_color("Libertarian"), "#f39c12")
+        self.assertEqual(party_color("Green"), "#27ae60")
+        self.assertEqual(party_badge("Republican"), "badge-republican")
+        self.assertEqual(party_fill("Democratic"), ("#1a73e8", 0.25))
+
+    def test_federal_or_state(self):
+        from civiclens.helpers import is_federal, is_state
+        self.assertTrue(is_federal(rep("NC-1", jur_class="country")))
+        self.assertTrue(is_state(rep("15")))
+        self.assertFalse(is_federal({}) or is_state({}))
+
+
+class DeadlineStatus(unittest.TestCase):
+    """The Passed / Today / Tomorrow / In N days badge, against a fixed "today"."""
+
+    def badge(self, last_day, today="2026-10-13"):
+        import datetime
+        from unittest import mock
+        from civiclens.tabs import deadlines
+        with mock.patch.object(deadlines, "today", return_value=datetime.date.fromisoformat(today)):
+            return deadlines.status_badge(last_day)
+
+    def test_passed(self):
+        self.assertIn(">Passed<", self.badge("2026-10-12"))
+
+    def test_today(self):
+        self.assertIn(">Today<", self.badge("2026-10-13"))
+
+    def test_tomorrow(self):
+        self.assertIn(">Tomorrow<", self.badge("2026-10-14"))
+
+    def test_within_a_week(self):
+        self.assertIn(">In 7 days<", self.badge("2026-10-20"))
+
+    def test_more_than_a_week_has_no_badge(self):
+        self.assertEqual(self.badge("2026-10-21"), "")
+
+
+class ElectionCountdown(unittest.TestCase):
+    def countdown(self, days):
+        from unittest import mock
+        from civiclens.tabs import home
+        with mock.patch.object(home, "days_until_election", return_value=days):
+            return home.countdown_html()
+
+    def test_days_until_election(self):
+        import datetime
+        from civiclens.ui import days_until_election
+        self.assertEqual(days_until_election(datetime.date(2026, 10, 13)), 21)
+        self.assertEqual(days_until_election(datetime.date(2026, 11, 3)), 0)
+
+    def test_labels(self):
+        self.assertIn("days until Election Day", self.countdown(2))
+        self.assertIn("day until Election Day", self.countdown(1))
+        self.assertNotIn("days until", self.countdown(1))
+        self.assertIn("Election Day is today", self.countdown(0))
+
+    def test_hidden_after_election_day(self):
+        self.assertEqual(self.countdown(-1), "")
+
+
+class I18nHelpers(unittest.TestCase):
     def setUp(self):
-        import importlib
+        import streamlit as st
+        self.st = st
+        self.addCleanup(st.session_state.__setitem__, "lang", "en")
+
+    def test_translate_falls_back_to_english(self):
+        from civiclens.i18n import ES, translate
+        self.assertEqual(translate("Not a real string", "es"), "Not a real string")
+        self.assertEqual(translate("Passed", "es"), ES["Passed"])
+        self.assertEqual(translate("Passed", "en"), "Passed")
+
+    def test_pick_and_month_day(self):
+        from civiclens.i18n import month_day, pick
+        self.st.session_state["lang"] = "es"
+        self.assertEqual(pick({"en": "Hi", "es": "Hola"}), "Hola")
+        self.assertEqual(month_day("2026-10-09"), ("oct", 9))
+        self.st.session_state["lang"] = "en"
+        self.assertEqual(pick({"en": "Hi"}), "Hi")
+        self.assertEqual(month_day("2026-10-09"), ("Oct", 9))
+
+    def test_label_func_keeps_language_from_draw_time(self):
+        # Streamlit can call format_func after the run, when the session can't be read
+        from civiclens.i18n import ES, label_func
+        self.st.session_state["lang"] = "es"
+        fmt = label_func()
+        self.st.session_state["lang"] = "en"
+        self.assertEqual(fmt("North Carolina"), ES["North Carolina"])
+
+
+class BillHelpers(unittest.TestCase):
+    def test_abstract_skips_empty_entries(self):
+        from civiclens.tabs.bills import bill_abstract
+        self.assertEqual(bill_abstract({"abstracts": [{"abstract": "  "}, {"abstract": " Raises pay. "}]}),
+                         "Raises pay.")
+        self.assertEqual(bill_abstract({"abstracts": None}), "")
+        self.assertEqual(bill_abstract({}), "")
+
+    def test_primary_sponsor_preferred(self):
+        from civiclens.tabs.bills import primary_sponsor
+        bill = {"sponsorships": [
+            {"primary": False, "name": "Co Sponsor"},
+            {"primary": True, "name": "Main Sponsor",
+             "person": {"party": "Republican", "current_role": {"title": "Senator"}}}]}
+        self.assertEqual(primary_sponsor(bill), ("Main Sponsor", "Republican", "Senator"))
+
+    def test_first_sponsor_when_none_primary(self):
+        from civiclens.tabs.bills import primary_sponsor
+        bill = {"sponsorships": [{"person": {"name": "Only Person"}}]}
+        self.assertEqual(primary_sponsor(bill), ("Only Person", "", ""))
+        self.assertEqual(primary_sponsor({}), ("", "", ""))
+
+
+class ContactLinks(unittest.TestCase):
+    def test_mailto_skips_urls_and_escapes(self):
+        from civiclens.tabs.my_reps import mailto_link
+        self.assertEqual(mailto_link("https://example.gov/contact"), "")
+        self.assertEqual(mailto_link(""), "")
+        self.assertIn("mailto:a&amp;b@nc.gov", mailto_link("a&b@nc.gov"))
+
+    def test_contact_form(self):
+        from civiclens.tabs.my_reps import contact_form_link
+        self.assertEqual(contact_form_link(""), "")
+        self.assertIn("href='https://x.gov/?a=1&amp;b=2'", contact_form_link("https://x.gov/?a=1&b=2"))
+
+    def test_governor_links(self):
+        from civiclens.data.governors import governor_links_html
+        html = governor_links_html({"site": "https://www.governor.nc.gov/",
+                                    "wikipedia": "https://en.wikipedia.org/wiki/X"})
+        self.assertIn(">governor.nc.gov<", html)
+        self.assertIn(">Wikipedia<", html)
+        self.assertEqual(governor_links_html({}), "")
+        self.assertNotIn("Wikipedia", governor_links_html({"site": "https://gov.ca.gov"}))
+
+
+class RateLimit(unittest.TestCase):
+    def test_blocks_after_limit_then_recovers(self):
         import types
         from unittest import mock
-        # config.py reads real secrets at import time; tests run without any
-        fake_config = types.SimpleNamespace(GEMINI_KEY="SECRETKEY", GROQ_KEY="g", TAVILY_KEY="t",
-                                            GOOGLE_KEY="", OPENSTATES_KEY="")
-        patcher = mock.patch.dict(sys.modules, {"civiclens.config": fake_config})
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        sys.modules.pop("civiclens.data.ai", None)
-        self.addCleanup(sys.modules.pop, "civiclens.data.ai", None)
-        self.ai = importlib.import_module("civiclens.data.ai")
-        self.mock = mock
+        from civiclens import helpers
+        clock = [1000.0]
+        with mock.patch.object(helpers, "st", types.SimpleNamespace(session_state={})), \
+                mock.patch.object(helpers.time, "time", lambda: clock[0]):
+            self.assertTrue(all(helpers.rate_limit_check("k", max_calls=5, window=60) for _ in range(5)))
+            self.assertFalse(helpers.rate_limit_check("k", max_calls=5, window=60))
+            clock[0] += 61
+            self.assertTrue(helpers.rate_limit_check("k", max_calls=5, window=60))
 
-    def response(self, status, payload):
-        return self.mock.Mock(status_code=status, json=lambda: payload)
 
-    def summary(self, title):
-        return self.ai.get_bill_summary("b", title, "Filed", "Virginia", "en", "Official text.")
+class StaticData(unittest.TestCase):
+    def test_states_registry(self):
+        from civiclens.states import STATE_NAME_TO_ABBR, STATES
+        self.assertEqual(len(STATES), 51)
+        self.assertEqual(len({s["fips"] for s in STATES.values()}), 51)
+        for abbr, info in STATES.items():
+            self.assertRegex(info["fips"], r"^\d{2}$", abbr)
+            self.assertEqual(STATE_NAME_TO_ABBR[info["name"].lower()], abbr)
+        self.assertEqual(STATE_NAME_TO_ABBR["washington, d.c."], "DC")
 
-    def test_groq_answers_when_gemini_is_rate_limited(self):
-        def post(url, **kwargs):
-            if "generativelanguage" in url:
-                return self.response(429, {"error": {}})
-            return self.response(200, {"choices": [{"message": {"content": "From Groq."}}]})
-        with self.mock.patch.object(self.ai.requests, "post", side_effect=post):
-            self.assertEqual(self.summary("Fallback bill"), "From Groq.")
+    def test_palettes(self):
+        from civiclens.theme import PALETTES
+        for key, palette in PALETTES.items():
+            self.assertEqual(len(palette), 7, key)
+            for color in palette[1:]:
+                self.assertRegex(color, r"^#[0-9A-Fa-f]{6}$", key)
 
-    def test_failure_is_not_cached(self):
-        down = self.mock.patch.object(self.ai.requests, "post",
-                                      side_effect=ConnectionError("url /v1beta?key=SECRETKEY"))
-        with down:
-            first = self.summary("Retry bill")
-        self.assertTrue(first.startswith("⚠️"))
-        self.assertNotIn("SECRETKEY", first)
-        ok = self.response(200, {"candidates": [{"content": {"parts": [{"text": "Works now."}]}}]})
-        with self.mock.patch.object(self.ai.requests, "post", return_value=ok):
-            self.assertEqual(self.summary("Retry bill"), "Works now.")
+    def test_official_links_are_https(self):
+        from civiclens.data.civic import STATE_OFFICIAL_LINKS, get_official_resources
+        from civiclens.states import STATES
+        for abbr in STATES:
+            for label, url in get_official_resources(abbr):
+                self.assertTrue(url.startswith("https://"), f"{abbr}: {label}")
+        self.assertEqual(set(STATE_OFFICIAL_LINKS), {"NC", "SC", "VA", "TN", "GA"})
+
+    def test_generic_resources_use_lowercase_vote_gov_path(self):
+        from civiclens.data.civic import get_official_resources
+        urls = [url for _, url in get_official_resources("CA")]
+        self.assertIn("https://vote.gov/register/ca/", urls)
+        self.assertEqual(get_official_resources(""), get_official_resources("NC"))
 
 
 if __name__ == "__main__":

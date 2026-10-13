@@ -100,7 +100,7 @@ streamlit run civiclens_app.py
 ### 5. Run the tests
 
 ```bash
-python -m unittest discover -s tests -v   # unit tests for the matching, labeling, and HTML-safety logic
+python -m unittest discover -s tests -v   # unit tests (logic, plus every API call with the network mocked)
 python tests/smoke_test.py                # render check for every section
 ```
 
@@ -135,7 +135,9 @@ civiclens/
     geocode.py  civic.py  openstates.py  congress.py  governors.py  tiger.py  ai.py
   tabs/                 # one module per sidebar section, each with render()
 tests/
-  test_logic.py         # unit tests
+  test_logic.py         # unit tests for the app's logic and data
+  test_fetchers.py      # unit tests for API calls, with the network mocked
+  support.py            # fake API keys shared by the unit tests
   smoke_test.py         # render check for every section
 .github/workflows/      # runs both test suites on every push
 privacy-policy.html

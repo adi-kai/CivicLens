@@ -32,26 +32,26 @@ PARTY_COLORS = {
 }
 
 def party_color(party: str) -> str:
-    p = party.lower()
+    p = (party or "").lower()
     for key, color in PARTY_COLORS.items():
         if key in p:
             return color
     return "#7f8c8d"
 
 def party_css(party: str) -> str:
-    p = party.lower()
+    p = (party or "").lower()
     if "democrat" in p:   return "democrat"
     if "republican" in p: return "republican"
     return "other"
 
 def party_badge(party: str) -> str:
-    p = party.lower()
+    p = (party or "").lower()
     if "democrat" in p:   return "badge-democrat"
     if "republican" in p: return "badge-republican"
     return "badge-other"
 
 def party_fill(party: str) -> tuple:
-    p = party.lower()
+    p = (party or "").lower()
     if "democrat" in p:   return "#1a73e8", 0.25
     if "republican" in p: return "#c0392b", 0.25
     return "#888888", 0.15
@@ -115,6 +115,20 @@ def state_legislator_title(title: str, jurisdiction_name: str = "") -> str:
         return title
     return f"State {title}"
 
+AT_LARGE_DISTRICTS = {"0", "AL", "AT-LARGE", "AT LARGE"}
+
+def house_district_label(dist) -> str:
+    """"NC-14" → "U.S. House — District 14". congress-legislators numbers a state's single
+    seat 0, so "WY-0" (or "AL") is labeled at-large rather than "District WY-0"."""
+    raw = str(dist or "").strip().upper()
+    # Check before stripping the state prefix, which would turn "AT-LARGE" into "LARGE"
+    dist = raw if raw in AT_LARGE_DISTRICTS else re.sub(r"^[A-Z]{2}-", "", raw)
+    if dist.isdigit():
+        dist = str(int(dist))
+    if dist in AT_LARGE_DISTRICTS:
+        return t("U.S. House At-Large")
+    return t("U.S. House — District {district}", district=dist)
+
 def get_chamber_label(rep: dict) -> str:
     roles = rep.get("current_role", {}) or {}
     dist  = roles.get("district", "")
@@ -124,7 +138,7 @@ def get_chamber_label(rep: dict) -> str:
         if org == "upper":
             state_name = dist or (rep.get("jurisdiction", {}) or {}).get("name", "")
             return t("U.S. Senator — {state}", state=t(state_name)) if state_name else t("U.S. Senator")
-        return t("U.S. House — District {district}", district=dist)
+        return house_district_label(dist)
     if is_state(rep):
         title = state_legislator_title(title, (rep.get("jurisdiction") or {}).get("name", ""))
     return t("{title} — District {district}", title=t(title), district=dist)
