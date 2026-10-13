@@ -280,6 +280,32 @@ class HouseLabels(unittest.TestCase):
             self.assertEqual(get_chamber_label(self.house(district)), "U.S. House At-Large", district)
 
 
+class PlainLabels(unittest.TestCase):
+    """The design shows labels without the emoji their translation keys start with."""
+
+    def test_leading_emoji_removed(self):
+        from civiclens.helpers import plain
+        self.assertEqual(plain("📍 Address 1"), "Address 1")
+        self.assertEqual(plain("🇺🇸 U.S. Senate"), "U.S. Senate")
+        self.assertEqual(plain("⚠️ Map loaded with errors"), "Map loaded with errors")
+
+    def test_text_left_alone(self):
+        from civiclens.helpers import plain
+        self.assertEqual(plain("2026 Candidates"), "2026 Candidates")
+        self.assertEqual(plain("¡Datos del mapa cargados!"), "¡Datos del mapa cargados!")
+        self.assertEqual(plain("Open →"), "Open →")
+        self.assertEqual(plain(""), "")
+
+    def test_every_nav_label_is_plain_text(self):
+        import re
+        from civiclens.helpers import plain
+        from civiclens.i18n import ES
+        from civiclens.tabs.home import FEATURES
+        for key in list(FEATURES) + ["🏠 Home"]:
+            for label in (plain(key), plain(ES[key])):
+                self.assertRegex(label, r"^[\w¿¡]", key)
+
+
 class PartyHelpers(unittest.TestCase):
     def test_missing_party_does_not_crash(self):
         from civiclens.helpers import party_badge, party_color, party_fill, party_label
@@ -333,9 +359,9 @@ class DeadlineStatus(unittest.TestCase):
 class ElectionCountdown(unittest.TestCase):
     def countdown(self, days):
         from unittest import mock
-        from civiclens.tabs import home
-        with mock.patch.object(home, "days_until_election", return_value=days):
-            return home.countdown_html()
+        from civiclens import ui
+        with mock.patch.object(ui, "days_until_election", return_value=days):
+            return ui.countdown_html()
 
     def test_days_until_election(self):
         import datetime
@@ -398,6 +424,13 @@ class BillHelpers(unittest.TestCase):
             {"primary": True, "name": "Main Sponsor",
              "person": {"party": "Republican", "current_role": {"title": "Senator"}}}]}
         self.assertEqual(primary_sponsor(bill), ("Main Sponsor", "Republican", "Senator"))
+
+    def test_subject_tags_split_semicolon_lists(self):
+        from civiclens.tabs.bills import subject_tags
+        bill = {"subject": ["AGRICULTURE; FUELS; TAXES", "FUEL; TAXES"]}
+        self.assertEqual(subject_tags(bill), ["AGRICULTURE", "FUELS", "TAXES"])
+        self.assertEqual(subject_tags({"subject": ["Education", "Health"]}), ["Education", "Health"])
+        self.assertEqual(subject_tags({}), [])
 
     def test_first_sponsor_when_none_primary(self):
         from civiclens.tabs.bills import primary_sponsor

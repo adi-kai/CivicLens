@@ -1,9 +1,9 @@
 """Home: banner with the Election Day countdown, section cards, and why the data is trustworthy."""
 import streamlit as st
 
-from civiclens.helpers import esc
-from civiclens.i18n import format_date, pick, t
-from civiclens.ui import ELECTION_DAY, days_until_election, section_label
+from civiclens.helpers import esc, plain
+from civiclens.i18n import pick, t
+from civiclens.ui import page_header, section_label
 
 # One card per section, in sidebar order (keys match SECTIONS in civiclens_app.py)
 FEATURES = {
@@ -37,41 +37,21 @@ def open_section(key: str):
     st.session_state["menu"] = key
 
 
-def countdown_html() -> str:
-    days = days_until_election()
-    date = esc(format_date(ELECTION_DAY.isoformat()))
-    if days > 1:
-        num, label = str(days), t("days until Election Day")
-    elif days == 1:
-        num, label = "1", t("day until Election Day")
-    elif days == 0:
-        num, label = "🗳️", t("Election Day is today")
-    else:
-        return ""
-    return (f'<div class="cl-countdown"><div class="cl-countdown-num">{num}</div>'
-            f'<div class="cl-countdown-label">{esc(label)}<br>{date}</div></div>')
-
-
 def render():
-    st.markdown(
-        '<div class="cl-hero cl-home-hero"><div class="cl-hero-text">'
-        f'<span class="cl-eyebrow">{esc(t("Nonpartisan · All 50 states + DC · English / Español"))}</span>'
-        f'<h1>{esc(t("Your guide to voting in 2026"))}</h1>'
-        f'<p class="cl-hero-sub">{esc(t("Your complete guide to voting and civic life — in all 50 states and DC"))}. '
-        f'{esc(t("Type your address once and every section uses it."))}</p>'
-        f'</div>{countdown_html()}</div>',
-        unsafe_allow_html=True,
-    )
+    page_header(t("Your guide to voting in 2026"),
+                f'{t("Your complete guide to voting and civic life — in all 50 states and DC")}. '
+                f'{t("Type your address once and every section uses it.")}',
+                eyebrow=t("Nonpartisan · All 50 states + DC · English / Español"),
+                countdown=True, css_class="cl-home-hero")
 
     section_label(t("Get started"))
     keys = list(FEATURES)
     for row in range(0, len(keys), 4):
-        for col, key in zip(st.columns(4), keys[row:row + 4]):
-            icon, title = t(key).split(" ", 1)
+        for col, (number, key) in zip(st.columns(4), enumerate(keys[row:row + 4], start=row + 1)):
             with col, st.container(border=True):
                 st.markdown(
-                    f'<div class="cl-feature-icon" aria-hidden="true">{icon}</div>'
-                    f'<div class="cl-feature-title">{esc(title)}</div>'
+                    f'<div class="cl-feature-num">{number:02d}</div>'
+                    f'<div class="cl-feature-title">{esc(plain(t(key)))}</div>'
                     f'<div class="cl-feature-desc">{esc(pick(FEATURES[key]))}</div>',
                     unsafe_allow_html=True,
                 )
@@ -80,9 +60,8 @@ def render():
 
     section_label(t("Why you can trust it"))
     items = "".join(
-        f'<div class="cl-trust-item"><div class="cl-trust-icon" aria-hidden="true">{icon}</div>'
-        f'<div><b>{esc(t(title))}</b><span>{esc(t(desc))}</span></div></div>'
-        for icon, title, desc in TRUST
+        f'<div class="cl-trust-item"><b>{esc(t(title))}</b><span>{esc(t(desc))}</span></div>'
+        for _, title, desc in TRUST
     )
     st.markdown(f'<div class="cl-trust">{items}</div>', unsafe_allow_html=True)
     st.caption(t("Data: OpenStates · U.S. Census TIGERweb · Google Civic API · unitedstates/congress-legislators · Wikidata · Google Gemini AI"))

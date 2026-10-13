@@ -201,10 +201,12 @@ def button(at, label):
 
 
 def go(at, section):
-    # AppTest matches radio options by their displayed label, which is translated in Spanish
+    # AppTest matches radio options by their displayed label: translated in Spanish, and
+    # shown without the key's leading emoji
+    from civiclens.helpers import plain
     from civiclens.i18n import ES
     radio = at.sidebar.radio[0]
-    label = section if section in radio.options else ES[section]
+    label = next(plain(s) for s in (section, ES.get(section, section)) if plain(s) in radio.options)
     return radio.set_value(label).run()
 
 
@@ -271,7 +273,7 @@ def rep_map(at):
 def bills(at):
     PROMPTS.clear()
     go(at, "📋 Bill Tracker")
-    for b in [b for b in at.button if b.label == "✨ Plain-English Summary"]:
+    for b in [b for b in at.button if b.label == "Plain-English Summary"]:
         b.click().run()
     used_abstract = any("Raises teacher pay by 3 percent." in p for p in PROMPTS)
     return (["HB 1", "State Senator Jay Sponsor (Democratic)", "This bill funds schools.",
@@ -301,8 +303,8 @@ def deadlines_sc(at):
             ">Passed<", "SC Election Commission"]
 
 def theme(at):
-    next(s for s in at.sidebar.selectbox if s.label == "Color theme").set_value("midnight").run()
-    return ["--cl-paper: #15112B"]
+    next(s for s in at.sidebar.selectbox if s.label == "Color theme").set_value("night").run()
+    return ["--cl-paper: #16140F"]
 
 
 # ── Spanish ──────────────────────────────────────────────────────────────────
@@ -341,7 +343,7 @@ def es_rep_map(at):
 def es_bills(at):
     PROMPTS.clear()
     go(at, "📋 Bill Tracker")
-    button(at, "✨ Resumen en lenguaje sencillo").click().run()
+    button(at, "Resumen en lenguaje sencillo").click().run()
     asked_spanish = any("plain Spanish" in p for p in PROMPTS)
     return ["Proyectos de ley estatales", "Jay Sponsor (Demócrata) · Senado estatal",
             "This bill funds schools."] + ([] if asked_spanish else ["<summary prompt asked for Spanish>"])

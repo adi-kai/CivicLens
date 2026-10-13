@@ -14,11 +14,11 @@ from civiclens.data.tiger import (LAYER_STATE_HOUSE, LAYER_STATE_SENATE, LAYER_U
                                   US_STATES_GEOJSON_URL, extract_district_key,
                                   fetch_tiger_geojson)
 from civiclens.helpers import (address_input, build_rep_lookup, esc, get_chamber_label,
-                               html_block, party_color, party_fill, party_label,
+                               html_block, party_color, party_fill, party_label, plain,
                                show_searched_address)
 from civiclens.i18n import t
 from civiclens.states import DEFAULT_STATE, STATES
-from civiclens.ui import page_header
+from civiclens.ui import page_header, section_label
 
 def build_district_layer(geojson: dict, rep_lookup: dict, layer_name: str,
                          district_field: str = "") -> folium.FeatureGroup:
@@ -66,7 +66,7 @@ def render():
     page_header(t("🗺️ District Map"),
                 t("Real district boundaries from the U.S. Census Bureau, colored by party. Click any district for rep details."))
 
-    if st.button(t("🔄 Clear map cache"), help=t("Force re-fetch boundaries from Census — use if districts look wrong")):
+    if st.button(plain(t("🔄 Clear map cache")), type="secondary", help=t("Force re-fetch boundaries from Census — use if districts look wrong")):
         st.cache_data.clear()
         st.success(t("Cache cleared — click Show Map to reload."))
 
@@ -81,7 +81,7 @@ def render():
             help=t("Auto-overridden if your address above resolves to a different state."),
         )
 
-    st.markdown(f"**{t('Show district layer:')}**")
+    section_label(esc(t("Show district layer:")))
     col1, col2, col3, col4, col5 = st.columns(5)
     # DC has a Mayor, not a Governor. An address below can still override the dropdown,
     # in which case the layer name and popup follow the address's state.
@@ -93,7 +93,7 @@ def render():
 
     if st.button(t("Show Map"), type="primary"):
         with st.status(t("Loading district data…"), expanded=True) as load_status:
-            st.write(t("📡 Geocoding address…"))
+            st.write(plain(t("📡 Geocoding address…")))
             lat, lng, detected_state = None, None, None
             if address.strip():
                 lat, lng, detected_state = geocode(address)
@@ -105,9 +105,9 @@ def render():
             state_name = state_info["name"]   # English — used to match the outline file
             state_disp = t(state_name)
             if detected_state and detected_state != manual_state:
-                st.write(t("📍 Address resolved to **{state}** — using that state.", state=state_disp))
+                st.write(plain(t("📍 Address resolved to **{state}** — using that state.", state=state_disp)))
 
-            st.write(t("🗺️ Fetching Census district boundaries for {state}…", state=state_disp))
+            st.write(plain(t("🗺️ Fetching Census district boundaries for {state}…", state=state_disp)))
             geojson_us_house,     us_house_geo_err     = fetch_tiger_geojson(LAYER_US_HOUSE, state_fips, state_abbr)     if show_us_house    else ({}, "")
             geojson_state_senate, state_senate_geo_err = fetch_tiger_geojson(LAYER_STATE_SENATE, state_fips, state_abbr) if show_state_sen   else ({}, "")
             geojson_state_house,  state_house_geo_err  = fetch_tiger_geojson(LAYER_STATE_HOUSE, state_fips, state_abbr)  if show_state_house else ({}, "")
@@ -121,7 +121,7 @@ def render():
                 ] if err
             ]
 
-            st.write(t("👥 Loading representative data…"))
+            st.write(plain(t("👥 Loading representative data…")))
             # A failed roster load is reported below as a missing-names warning
             state_senate_reps, _ = get_state_reps_by_chamber(state_abbr, "upper") if show_state_sen   else ([], "")
             state_house_reps,  _ = get_state_reps_by_chamber(state_abbr, "lower") if show_state_house else ([], "")
@@ -134,27 +134,27 @@ def render():
             lookup_state_house  = build_rep_lookup(state_house_reps)
             lookup_us_house     = build_rep_lookup(us_house_reps)
             if boundary_errors:
-                load_status.update(label=t("⚠️ Map loaded with errors — see below"), state="error", expanded=False)
+                load_status.update(label=plain(t("⚠️ Map loaded with errors — see below")), state="error", expanded=False)
             else:
-                load_status.update(label=t("✅ Map data loaded!"), state="complete", expanded=False)
+                load_status.update(label=plain(t("✅ Map data loaded!")), state="complete", expanded=False)
 
         # Surface boundary failures outside the status box so they aren't hidden when it collapses
         for label, layer_id, err in boundary_errors:
-            st.warning(t("⚠️ Could not load {label} district boundaries (TIGERweb layer {layer}). Last error: {err}. Click Show Map to retry. If this keeps happening, the Census TIGERweb layer IDs may have shifted again — check: tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer",
-                         label=label, layer=layer_id, err=err))
+            st.warning(plain(t("⚠️ Could not load {label} district boundaries (TIGERweb layer {layer}). Last error: {err}. Click Show Map to retry. If this keeps happening, the Census TIGERweb layer IDs may have shifted again — check: tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer",
+                         label=label, layer=layer_id, err=err)))
 
         # Surface rep-load failures (st.warning not allowed inside cached functions)
         if show_state_sen and not state_senate_reps:
-            st.warning(t("⚠️ Could not load {chamber} representatives. Boundaries will show without rep names.", chamber=senate_layer))
+            st.warning(plain(t("⚠️ Could not load {chamber} representatives. Boundaries will show without rep names.", chamber=senate_layer)))
         if show_state_house and not state_house_reps:
-            st.warning(t("⚠️ Could not load {chamber} representatives. Boundaries will show without rep names.", chamber=house_layer))
+            st.warning(plain(t("⚠️ Could not load {chamber} representatives. Boundaries will show without rep names.", chamber=house_layer)))
         if show_us_house and not us_house_reps:
-            st.warning(t("⚠️ Could not load {chamber} representatives. Boundaries will show without rep names.", chamber=t("U.S. House")))
+            st.warning(plain(t("⚠️ Could not load {chamber} representatives. Boundaries will show without rep names.", chamber=t("U.S. House"))))
         if show_us_sen and not us_senators and state_abbr != "DC":
-            st.warning(t("⚠️ Could not load U.S. Senators. The Senate overlay will show without names."))
+            st.warning(plain(t("⚠️ Could not load U.S. Senators. The Senate overlay will show without names.")))
         if show_gov and governor_err:
-            st.warning(t("⚠️ Could not load the current {office} — {err}. The overlay will show without a name.",
-                         office=gov_office.lower(), err=governor_err))
+            st.warning(plain(t("⚠️ Could not load the current {office} — {err}. The overlay will show without a name.",
+                         office=gov_office.lower(), err=governor_err)))
 
         show_searched_address(address)
 
@@ -288,7 +288,7 @@ def render():
 
         if lat:
             folium.Marker(
-                location=[lat, lng], popup=t("📍 Your Address"), tooltip=t("You are here"),
+                location=[lat, lng], popup=plain(t("📍 Your Address")), tooltip=t("You are here"),
                 icon=folium.Icon(color="black", icon="home", prefix="fa"),
             ).add_to(m)
 
@@ -296,9 +296,9 @@ def render():
         st.markdown(f"""
         <div class="map-legend">
             <strong style="font-size:0.85rem">{t("Party Key:")}</strong>
-            <div class="legend-item"><span class="legend-dot" style="background:#1a73e8"></span> {t("Democrat")}</div>
-            <div class="legend-item"><span class="legend-dot" style="background:#c0392b"></span> {t("Republican")}</div>
-            <div class="legend-item"><span class="legend-dot" style="background:#888"></span> {t("Other / Unknown")}</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#1a73e8" aria-hidden="true"></span> {t("Democrat")}</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#c0392b" aria-hidden="true"></span> {t("Republican")}</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#888" aria-hidden="true"></span> {t("Other / Unknown")}</div>
             <span style="font-size:0.78rem;color:var(--cl-muted);margin-left:auto">{t("Click any district for rep details")}</span>
         </div>
         """, unsafe_allow_html=True)

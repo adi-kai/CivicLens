@@ -3,10 +3,10 @@ import streamlit as st
 
 from civiclens.data.civic import get_official_resources, get_voter_info
 from civiclens.data.geocode import geocode
-from civiclens.helpers import address_input, esc, show_searched_address
+from civiclens.helpers import address_input, esc, plain, show_searched_address
 from civiclens.i18n import t
 from civiclens.states import STATES
-from civiclens.ui import page_header
+from civiclens.ui import official_links, page_header, section_label
 
 
 def render():
@@ -29,7 +29,7 @@ def render():
             if "pollingLocations" in data and data["pollingLocations"]:
                 loc  = data["pollingLocations"][0]
                 addr = loc.get("address", {})
-                st.success(t("✅ Polling location found!"))
+                st.success(plain(t("✅ Polling location found!")))
                 st.markdown(f"""
                 <div class="info-box">
                     <strong>{esc(addr.get('locationName', t('Polling Location')))}</strong><br>
@@ -39,7 +39,7 @@ def render():
                 """, unsafe_allow_html=True)
                 hours = loc.get("pollingHours", "")
                 if hours:
-                    st.caption(t("🕐 Hours: {hours}", hours=hours))
+                    st.caption(plain(t("🕐 Hours: {hours}", hours=hours)))
             else:
                 st.warning(t("Polling location not available right now — no active election. Use these resources:"))
 
@@ -55,9 +55,7 @@ def render():
             civic_links = [(label, url) for label, url in civic_links if url]
 
             if state_name:
-                st.subheader(t("🗳️ {state} Voting Resources", state=state_name))
+                section_label(esc(t("🗳️ {state} Voting Resources", state=state_name)))
             else:
-                st.subheader(t("🗳️ Voting Resources"))
-            links_to_show = civic_links if civic_links else get_official_resources(detected_state)
-            for label, url in links_to_show:
-                st.markdown(f"- [{label}]({url})")
+                section_label(t("🗳️ Voting Resources"))
+            official_links(civic_links if civic_links else get_official_resources(detected_state))

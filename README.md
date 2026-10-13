@@ -14,7 +14,7 @@ Built for the 2026 election cycle.
 |---|---|
 | ![Official races and candidates on a Richmond, Virginia ballot](docs/screenshots/my-ballot.png) | ![Governor, U.S. Senators, and U.S. Representative for an address](docs/screenshots/my-representatives.png) |
 | **Rep Map** | **Deadlines** |
-| ![North Carolina's U.S. House districts colored by party](docs/screenshots/rep-map.png) | ![North Carolina 2026 voting deadlines on calendar tiles, with sources](docs/screenshots/deadlines.png) |
+| ![North Carolina's U.S. House districts colored by party](docs/screenshots/rep-map.png) | ![North Carolina 2026 voting deadlines on ballot-stub date tiles, with sources](docs/screenshots/deadlines.png) |
 
 ---
 
@@ -33,7 +33,7 @@ Built for the 2026 election cycle.
 
 **¿Hablas español?** The sidebar's **Language / Idioma** picker switches the whole interface to Spanish, including AI bill summaries and candidate research. (Names and bill titles from the data sources stay as published, and the legal policies are in English.)
 
-Type your address once — it carries over as you move between sections. The sidebar also has a **color theme** picker (six light themes and a dark one). Your choice is remembered in the page URL — no cookies or accounts.
+Type your address once — it carries over as you move between sections. The sidebar also has a **color theme** picker (light or dark). Your choice is remembered in the page URL — no cookies or accounts.
 
 ---
 
@@ -130,7 +130,7 @@ civiclens/
   config.py             # API keys from secrets.toml
   states.py             # all 50 states + D.C., per-state race lists
   helpers.py            # shared helpers (party styling, rep labels, rate limiting)
-  theme.py              # fonts, card styles, color themes
+  theme.py              # fonts, the design's styles, light/dark color themes
   data/                 # one module per outside service, all cached
     geocode.py  civic.py  openstates.py  congress.py  governors.py  tiger.py  ai.py
   tabs/                 # one module per sidebar section, each with render()

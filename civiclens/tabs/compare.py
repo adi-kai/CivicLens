@@ -4,7 +4,7 @@ import streamlit as st
 from civiclens.data.geocode import geocode
 from civiclens.data.openstates import get_reps_by_location
 from civiclens.helpers import (address_input, esc, get_chamber_label, html_block, is_federal,
-                               is_state, party_badge, party_css, party_label)
+                               is_state, party_badge, party_label, plain)
 from civiclens.i18n import t
 from civiclens.states import STATES
 from civiclens.ui import page_header
@@ -12,13 +12,13 @@ from civiclens.ui import page_header
 
 def render():
     page_header(t("🔍 District Comparison"),
-                t("Enter any two U.S. addresses — in the same state or different states — to compare their representatives side by side. Shared reps are highlighted in green."))
+                t("Enter any two U.S. addresses — in the same state or different states — to compare their representatives side by side. Shared reps are marked “Shared”."))
 
     col1, col2 = st.columns(2)
     with col1:
-        addr1 = address_input(t("📍 Address 1"))
+        addr1 = address_input(plain(t("📍 Address 1")))
     with col2:
-        addr2 = st.text_input(t("📍 Address 2"), placeholder="100 Congress Ave, Austin, TX 78701", key="dc_addr2")
+        addr2 = st.text_input(plain(t("📍 Address 2")), placeholder="100 Congress Ave, Austin, TX 78701", key="dc_addr2")
 
     if st.button(t("Compare Districts"), type="primary"):
         if not addr1.strip() or not addr2.strip():
@@ -47,19 +47,16 @@ def render():
                         if rep_state:
                             label = t("{state} {label}", state=t(rep_state), label=label)
                     photo = rep.get("image", "")
-                    css, badge = party_css(party), party_badge(party)
-                    shared_html = (
-                        ' <span style="background:#d4edda;color:#155724;padding:1px 8px;'
-                        f'border-radius:10px;font-size:0.72rem;font-weight:600;">{t("Shared")}</span>'
-                    ) if shared else ""
-                    img_html = (f"<img src='{esc(photo)}' alt='{esc(name)}' width='45' "
-                                f"style='border-radius:50%;float:right;margin-left:8px'/>" if photo else "")
+                    shared_html = f'<span class="cl-shared">{t("Shared")}</span>' if shared else ""
+                    img_html = (f"<img src='{esc(photo)}' alt='{esc(name)}' width='48' height='48' "
+                                f"style='object-fit:cover;float:right;margin-left:12px;border:1px solid var(--cl-ink)'/>"
+                                if photo else "")
                     return html_block(f"""
-                    <div class="rep-card {css}">
+                    <div class="rep-card">
                         {img_html}
-                        <strong>{esc(name)}</strong>{shared_html}
-                        <span class="party-badge {badge}">{esc(party_label(party))}</span><br>
-                        <span style="color:var(--cl-muted);font-size:0.85rem">{esc(label)}</span>
+                        <div class="cl-kicker">{esc(label)}</div>
+                        <div class="cl-name" style="font-size:1.35rem">{esc(name)}{shared_html}</div>
+                        <span class="party-badge {party_badge(party)}" style="margin-left:0">{esc(party_label(party))}</span>
                     </div>""")
 
                 def sort_reps(reps):
@@ -67,7 +64,7 @@ def render():
 
                 left_col, right_col = st.columns(2)
                 with left_col:
-                    st.subheader(f"📍 {addr1[:45]}{'…' if len(addr1) > 45 else ''}")
+                    st.subheader(f"{addr1[:45]}{'…' if len(addr1) > 45 else ''}")
                     if state1 and state1 in STATES:
                         st.caption(t(STATES[state1]["name"]))
                     if reps1:
@@ -76,7 +73,7 @@ def render():
                     else:
                         st.warning(t("No representatives found."))
                 with right_col:
-                    st.subheader(f"📍 {addr2[:45]}{'…' if len(addr2) > 45 else ''}")
+                    st.subheader(f"{addr2[:45]}{'…' if len(addr2) > 45 else ''}")
                     if state2 and state2 in STATES:
                         st.caption(t(STATES[state2]["name"]))
                     if reps2:
@@ -86,7 +83,7 @@ def render():
                         st.warning(t("No representatives found."))
 
                 if shared_ids:
-                    st.success(t("✅ These addresses share **{count}** representative(s) — marked in green above.", count=len(shared_ids)))
+                    st.success(plain(t("✅ These addresses share **{count}** representative(s) — marked “Shared” above.", count=len(shared_ids))))
                 elif reps1 and reps2:
                     if state1 and state2 and state1 != state2:
                         st.info(t("These addresses are in different states ({state1} and {state2}), so they don't share any representatives — each state has its own legislators and U.S. Senators.",

@@ -154,7 +154,7 @@ def governor_links_html(gov: dict) -> str:
     links = []
     if gov.get("site"):
         host = re.sub(r"^https?://(www\.)?", "", gov["site"]).rstrip("/")
-        links.append(f"🌐 <a href='{esc(gov['site'])}' target='_blank'>{esc(host)}</a>")
+        links.append(f"<a href='{esc(gov['site'])}' target='_blank'>{esc(host)}</a>")
     if gov.get("wikipedia"):
         links.append(f"<a href='{esc(gov['wikipedia'])}' target='_blank'>Wikipedia</a>")
-    return " &nbsp;·&nbsp; ".join(links)
+    return "".join(links)

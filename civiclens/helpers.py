@@ -12,6 +12,15 @@ def esc(value) -> str:
     displays as written and can't add its own tags. Also safe inside quoted attributes."""
     return html.escape("" if value is None else str(value), quote=True)
 
+# Leading emoji and symbols on a label ("📍 Address 1", "✅ Map data loaded!"). Translations
+# keep them, so both languages share one key; the design shows text only. Spanish ¿ and ¡
+# are kept.
+_LEADING_ICON = re.compile(r"^[^\w¿¡\"'(\[]+\s*")
+
+def plain(text: str) -> str:
+    """A label without its leading emoji: plain("📍 Address 1") → "Address 1"."""
+    return _LEADING_ICON.sub("", text or "")
+
 def rate_limit_check(key: str, max_calls: int = 10, window: int = 60):
     """Block if user has made too many calls in the time window."""
     now = time.time()
@@ -94,11 +103,8 @@ def sanitize_ai_html(markup: str) -> str:
 def show_searched_address(address: str):
     """Prints the address actually being used, right above whatever results follow."""
     if address and address.strip():
-        st.markdown(f"""
-        <div class="info-box" style="padding:0.55rem 1rem;margin:0 0 0.9rem 0;">
-            📍 <strong>{t("Address:")}</strong> {esc(address)}
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f'<p class="cl-searched"><b>{t("Address:")}</b> {esc(address)}</p>',
+                    unsafe_allow_html=True)
 
 def is_federal(rep: dict) -> bool:
     return rep.get("jurisdiction", {}).get("classification", "") == "country"

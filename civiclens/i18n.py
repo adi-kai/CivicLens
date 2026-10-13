@@ -104,13 +104,8 @@ ES = {
     "📋 Bill Tracker": "📋 Proyectos de ley",
     "🔍 District Compare": "🔍 Comparar distritos",
     "🗳️ Candidates": "🗳️ Candidatos",
-    "Civic Teal": "Verde azulado cívico",
-    "Pine & Marigold": "Pino y caléndula",
-    "Plum & Mint": "Ciruela y menta",
-    "Slate & Tangerine": "Pizarra y mandarina",
-    "Midnight Violet": "Violeta medianoche",
-    "Classic Civic": "Cívico clásico",
-    "Red, White & Blue": "Rojo, blanco y azul",
+    "Ballot Paper": "Papel de boleta",
+    "Ballot Paper Night": "Papel de boleta (noche)",
     "Privacy Policy": "Política de privacidad",
     "Terms of Service": "Términos del servicio",
     "This document is available in English only.": "Este documento solo está disponible en inglés.",
@@ -341,8 +336,8 @@ ES = {
 
     # District Compare
     "🔍 District Comparison": "🔍 Comparación de distritos",
-    "Enter any two U.S. addresses — in the same state or different states — to compare their representatives side by side. Shared reps are highlighted in green.":
-        "Ingresa dos direcciones de EE. UU., del mismo estado o de estados distintos, para comparar sus representantes lado a lado. Los representantes en común aparecen resaltados en verde.",
+    "Enter any two U.S. addresses — in the same state or different states — to compare their representatives side by side. Shared reps are marked “Shared”.":
+        "Ingresa dos direcciones de EE. UU., del mismo estado o de estados distintos, para comparar sus representantes lado a lado. Los representantes en común aparecen marcados como «En común».",
     "📍 Address 1": "📍 Dirección 1",
     "📍 Address 2": "📍 Dirección 2",
     "Compare Districts": "Comparar distritos",
@@ -352,8 +347,8 @@ ES = {
     "{state} {label}": "{label} ({state})",
     "Shared": "En común",
     "No representatives found.": "No se encontraron representantes.",
-    "✅ These addresses share **{count}** representative(s) — marked in green above.":
-        "✅ Estas direcciones comparten **{count}** representante(s), marcados en verde arriba.",
+    "✅ These addresses share **{count}** representative(s) — marked “Shared” above.":
+        "✅ Estas direcciones comparten **{count}** representante(s), marcados como «En común» arriba.",
     "These addresses are in different states ({state1} and {state2}), so they don't share any representatives — each state has its own legislators and U.S. Senators.":
         "Estas direcciones están en estados distintos ({state1} y {state2}), así que no comparten representantes: cada estado tiene sus propios legisladores y senadores de EE. UU.",
     "These addresses have entirely separate sets of representatives.": "Estas direcciones tienen representantes completamente distintos.",

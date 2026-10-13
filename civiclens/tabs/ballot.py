@@ -8,11 +8,11 @@ import streamlit as st
 
 from civiclens.data.civic import get_official_resources, get_voter_info, parse_ballot
 from civiclens.data.geocode import geocode
-from civiclens.helpers import (address_input, esc, html_block, party_badge, party_css,
-                               party_label, show_searched_address)
+from civiclens.helpers import (address_input, esc, html_block, party_badge, party_label,
+                               plain, show_searched_address)
 from civiclens.i18n import format_date, t
 from civiclens.states import STATES
-from civiclens.ui import page_header, section_label
+from civiclens.ui import official_links, page_header, section_label
 
 # Google's messages when it can't match the address itself (vs. a state with no data yet)
 ADDRESS_ERRORS = ("parse", "no information", "invalid")
@@ -35,11 +35,8 @@ def race_card(race: dict):
         rows = f'<div class="cl-candidate"><span style="color:var(--cl-muted)">{t("No candidates listed.")}</span></div>'
     vote_for = (f'<span class="cl-pill">{t("Vote for {n}", n=race["vote_for"])}</span>'
                 if race["vote_for"] else "")
-    # Single-candidate or all-one-party races still get the neutral border
-    parties = {c["party"] for c in race["candidates"] if c["party"]}
-    css = party_css(parties.pop()) if len(parties) == 1 else "other"
     st.markdown(html_block(f"""
-    <div class="rep-card {css}">
+    <div class="rep-card">
         <div class="cl-race-head">
             <div><div class="cl-race-office">{esc(race["office"])}</div>
             <div class="cl-race-district">{esc(race["district"])}</div></div>
@@ -57,7 +54,7 @@ def measure_card(measure: dict):
             if measure["url"] else "")
     district = f'<span class="cl-pill">{esc(measure["district"])}</span>' if measure["district"] else ""
     st.markdown(html_block(f"""
-    <div class="rep-card other">
+    <div class="rep-card">
         <div class="cl-race-head">
             <div class="cl-race-office">{esc(measure["title"])}</div>
             {district}
@@ -95,8 +92,7 @@ def render():
         st.info(t("{state} hasn't published its ballot data yet. Election offices add official ballots state by state as Election Day gets closer — check back soon, or use the official resources below.",
                   state=where))
         section_label(t("🗳️ Official Resources"))
-        for label, url in get_official_resources(state):
-            st.markdown(f"- [{label}]({url})")
+        official_links(get_official_resources(state))
         return
 
     n_races, n_measures = len(ballot["races"]), len(ballot["measures"])
@@ -116,5 +112,5 @@ def render():
         for measure in ballot["measures"]:
             measure_card(measure)
 
-    st.button(t("🔎 Research these candidates"), on_click=go_to_candidates, type="secondary")
+    st.button(plain(t("🔎 Research these candidates")), on_click=go_to_candidates, type="secondary")
     st.caption(t("Official ballot data from the Voting Information Project, via the Google Civic Information API. Race names and ballot questions appear exactly as election officials published them. Your exact ballot can vary by precinct — check your official sample ballot before you vote."))

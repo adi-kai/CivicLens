@@ -2,7 +2,7 @@
 import streamlit as st
 
 from civiclens.data.ai import candidate_info_fallback, get_candidate_info
-from civiclens.helpers import html_block, rate_limit_check, sanitize_ai_html
+from civiclens.helpers import html_block, plain, rate_limit_check, sanitize_ai_html
 from civiclens.i18n import current_lang, t
 from civiclens.states import DEFAULT_STATE, STATES, get_candidate_races
 from civiclens.theme import theme_ai_html
@@ -44,19 +44,21 @@ def render():
             with st.spinner(t("Searching for 2026 {state} {race} candidates — may take 15–30 seconds…",
                               state=state_disp, race=race_disp)):
                 if not rate_limit_check("gemini_calls", max_calls=5, window=60):
-                    st.toast(t("⚡ Gemini limit reached, switching to backup…"), icon="🔄")
+                    st.toast(plain(t("⚡ Gemini limit reached, switching to backup…")))
                     html_output = candidate_info_fallback(clean_race, cand_state_name, lang)
                 else:
                     html_output = get_candidate_info(clean_race, cand_state_name, lang)
                     if html_output is None:
-                        st.toast(t("⚡ Gemini unavailable, switching to backup…"), icon="🔄")
+                        st.toast(plain(t("⚡ Gemini unavailable, switching to backup…")))
                         html_output = candidate_info_fallback(clean_race, cand_state_name, lang)
 
-            st.markdown(html_block(theme_ai_html(sanitize_ai_html(html_output))), unsafe_allow_html=True)
+            # The cl-ai wrapper restyles the prompt's inline card styles as ruled rows
+            cards = theme_ai_html(sanitize_ai_html(html_output)).replace("🌐 ", "")
+            st.markdown(html_block(f'<div class="cl-ai">{cards}</div>'), unsafe_allow_html=True)
             if cand_state == "NC":
                 verify_link = "[ncsbe.gov](https://www.ncsbe.gov)"
             else:
                 office = t("{state}'s election office", state=state_disp)
                 verify_link = f"[{office}](https://www.eac.gov/voters/register-and-vote-in-your-state)"
-            st.caption(t("⚠️ AI-assisted research from public web sources. Always verify with official campaign sites and {link}. Results cached for 1 hour.",
-                         link=verify_link))
+            st.caption(plain(t("⚠️ AI-assisted research from public web sources. Always verify with official campaign sites and {link}. Results cached for 1 hour.",
+                         link=verify_link)))

@@ -3,7 +3,7 @@ import streamlit as st
 
 from civiclens.data.ai import get_bill_summary
 from civiclens.data.openstates import get_state_bills
-from civiclens.helpers import esc, html_block, party_css, party_label, state_legislator_title
+from civiclens.helpers import esc, html_block, party_label, plain, state_legislator_title
 from civiclens.i18n import current_lang, label_func, t
 from civiclens.states import DEFAULT_STATE, STATES
 from civiclens.ui import page_header
@@ -23,6 +23,18 @@ def primary_sponsor(bill: dict) -> tuple:
     person = (primary or {}).get("person") or {}
     name = (primary or {}).get("name") or person.get("name") or ""
     return name, person.get("party") or "", (person.get("current_role") or {}).get("title", "")
+
+
+def subject_tags(bill: dict, limit: int = 3) -> list:
+    """Up to `limit` subject terms. Some states (e.g. NC) send one long "A; B; C" string
+    per subject instead of separate terms, so those are split apart."""
+    terms = []
+    for subject in bill.get("subject") or []:
+        for term in str(subject).split(";"):
+            term = term.strip()
+            if term and term not in terms:
+                terms.append(term)
+    return terms[:limit]
 
 
 def render():
@@ -70,11 +82,10 @@ def render():
             url         = bill.get("openstates_url", "#")
             bill_id     = bill.get("id", identifier)
             abstract    = bill_abstract(bill)
-            subjects    = (bill.get("subject") or [])[:3]
+            subjects    = subject_tags(bill)
             sponsor_name, sponsor_party, sponsor_title = primary_sponsor(bill)
             sponsor_name  = sponsor_name or t("Unknown")
             sponsor_title = state_legislator_title(sponsor_title, bills_state_name)
-            css           = party_css(sponsor_party)
             tags_html     = "".join(f'<span class="subject-tag">{esc(s)}</span>' for s in subjects)
             party_part    = f" ({party_label(sponsor_party)})" if sponsor_party else ""
             if sponsor_title:
@@ -82,26 +93,21 @@ def render():
             else:
                 sponsor_line = f"{sponsor_name}{party_part}"
             st.markdown(html_block(f"""
-            <div class="rep-card {css}" style="padding:0.85rem 1.1rem">
-                <strong>{esc(identifier)}</strong>
-                <span style="color:var(--cl-ink);font-size:0.97rem"> — {esc(title)}</span><br>
-                <span style="color:var(--cl-muted);font-size:0.83rem">
-                    👤 {esc(sponsor_line)}
-                    &nbsp;·&nbsp; 📅 {esc(latest_date)}
-                    &nbsp;·&nbsp; {esc(latest_act)}
-                </span>
-                {"<br>" + tags_html if tags_html else ""}
-                <br><a href="{esc(url)}" target="_blank" style="font-size:0.8rem;color:var(--cl-accent);">{t("View full bill on OpenStates →")}</a>
+            <div class="rep-card">
+                <div><span class="cl-bill-id">{esc(identifier)}</span><span class="cl-bill-title">{esc(title)}</span></div>
+                <div class="cl-bill-meta">{esc(sponsor_line)} · {esc(latest_date)} · {esc(latest_act)}</div>
+                {f"<div>{tags_html}</div>" if tags_html else ""}
+                <div style="margin-top:0.4rem;font-size:0.9rem"><a href="{esc(url)}" target="_blank">{t("View full bill on OpenStates →")}</a></div>
             </div>
             """), unsafe_allow_html=True)
 
             # Summaries are kept per language, so switching languages asks for a fresh one
             summary_key = f"summary_{bill_id}_{lang}"
-            if st.button(t("✨ Plain-English Summary"), key=f"btn_{bill_id}"):
+            if st.button(plain(t("✨ Plain-English Summary")), key=f"btn_{bill_id}", type="secondary"):
                 with st.spinner(t("Summarizing…")):
                     st.session_state[summary_key] = get_bill_summary(bill_id, title, latest_act, bills_state_name, lang, abstract)
             if summary_key in st.session_state:
-                st.info(f"💡 {st.session_state[summary_key]}")
+                st.info(st.session_state[summary_key])
                 if not st.session_state[summary_key].startswith("⚠️"):
                     st.caption(t("Based on the official bill summary.") if abstract else
                                t("Based on the bill title only — no official summary was published for this bill."))

@@ -8,6 +8,7 @@ import streamlit as st
 # Must be the first Streamlit call, before anything below renders.
 st.set_page_config(page_title="CivicLens", layout="wide", page_icon="🗳️")
 
+from civiclens.helpers import plain  # noqa: E402
 from civiclens.i18n import LANG_KEY, LANGUAGES, label_func, t  # noqa: E402
 from civiclens.tabs import (ballot, bills, candidates, compare, deadlines, home,  # noqa: E402
                             my_reps, polling, rep_map)
@@ -26,9 +27,8 @@ if LANG_KEY not in st.session_state:
     st.session_state[LANG_KEY] = url_lang if url_lang in LANGUAGES else "en"
 
 st.sidebar.markdown(
-    '<div class="cl-brand"><div class="cl-brand-mark" aria-hidden="true">🗳️</div>'
-    f'<div><div class="cl-brand-name">CivicLens</div>'
-    f'<div class="cl-brand-tag">{t("Nonpartisan voter guide")}</div></div></div>',
+    '<div class="cl-brand"><div class="cl-brand-name">CivicLens</div>'
+    f'<div class="cl-brand-tag">{t("Nonpartisan voter guide")}</div></div>',
     unsafe_allow_html=True,
 )
 
@@ -48,8 +48,11 @@ SECTIONS = {
     "🔍 District Compare":   compare.render,
     "🗳️ Candidates":         candidates.render,
 }
-# Keyed so the Home page's section cards can switch sections through session state
-menu = st.sidebar.radio(t("Navigate"), list(SECTIONS), key="menu", format_func=label_func())
+# Keyed so the Home page's section cards can switch sections through session state.
+# The keys keep their emoji (they're the translation keys); the nav shows text only.
+nav_label = label_func()
+menu = st.sidebar.radio(t("Navigate"), list(SECTIONS), key="menu",
+                        format_func=lambda key: plain(nav_label(key)))
 
 theme_keys = list(PALETTES)
 if "theme" not in st.session_state:
@@ -76,7 +79,6 @@ def read_policy_file(path: str):
     except OSError:
         return None
 
-st.markdown("---")
 for policy_title, policy_path in [("Privacy Policy", "privacy-policy.html"),
                                   ("Terms of Service", "terms-of-service.html")]:
     with st.expander(t(policy_title)):
