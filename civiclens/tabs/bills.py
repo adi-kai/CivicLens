@@ -53,6 +53,8 @@ def render():
             latest_date = (bill.get("latest_action_date") or "")[:10]
             url         = bill.get("openstates_url", "#")
             bill_id     = bill.get("id", identifier)
+            abstract    = next((a.get("abstract", "").strip() for a in bill.get("abstracts") or []
+                                if (a.get("abstract") or "").strip()), "")
             subjects    = (bill.get("subject") or [])[:3]
             sponsors    = bill.get("sponsorships", [])
             primary     = next((s for s in sponsors if s.get("primary")), sponsors[0] if sponsors else None)
@@ -85,6 +87,9 @@ def render():
             summary_key = f"summary_{bill_id}_{lang}"
             if st.button(t("✨ Plain-English Summary"), key=f"btn_{bill_id}"):
                 with st.spinner(t("Summarizing…")):
-                    st.session_state[summary_key] = get_bill_summary(bill_id, title, latest_act, bills_state_name, lang)
+                    st.session_state[summary_key] = get_bill_summary(bill_id, title, latest_act, bills_state_name, lang, abstract)
             if summary_key in st.session_state:
                 st.info(f"💡 {st.session_state[summary_key]}")
+                if not st.session_state[summary_key].startswith("⚠️"):
+                    st.caption(t("Based on the official bill summary.") if abstract else
+                               t("Based on the bill title only — no official summary was published for this bill."))

@@ -335,6 +335,9 @@ ES = {
     "View full bill on OpenStates →": "Ver el proyecto completo en OpenStates →",
     "✨ Plain-English Summary": "✨ Resumen en lenguaje sencillo",
     "Summarizing…": "Resumiendo…",
+    "Based on the official bill summary.": "Basado en el resumen oficial del proyecto de ley.",
+    "Based on the bill title only — no official summary was published for this bill.":
+        "Basado solo en el título — no se publicó un resumen oficial de este proyecto de ley.",
 
     # District Compare
     "🔍 District Comparison": "🔍 Comparación de distritos",

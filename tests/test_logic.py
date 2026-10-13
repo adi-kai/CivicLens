@@ -265,5 +265,50 @@ class DeadlineData(unittest.TestCase):
                     self.assertTrue(datetime.date(2026, 9, 1) <= day <= election + datetime.timedelta(days=7), where)
 
 
+
+class AiFallback(unittest.TestCase):
+    """Bill summaries fall back from Gemini to Groq, and a failed call isn't cached."""
+
+    def setUp(self):
+        import importlib
+        import types
+        from unittest import mock
+        # config.py reads real secrets at import time; tests run without any
+        fake_config = types.SimpleNamespace(GEMINI_KEY="SECRETKEY", GROQ_KEY="g", TAVILY_KEY="t",
+                                            GOOGLE_KEY="", OPENSTATES_KEY="")
+        patcher = mock.patch.dict(sys.modules, {"civiclens.config": fake_config})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        sys.modules.pop("civiclens.data.ai", None)
+        self.addCleanup(sys.modules.pop, "civiclens.data.ai", None)
+        self.ai = importlib.import_module("civiclens.data.ai")
+        self.mock = mock
+
+    def response(self, status, payload):
+        return self.mock.Mock(status_code=status, json=lambda: payload)
+
+    def summary(self, title):
+        return self.ai.get_bill_summary("b", title, "Filed", "Virginia", "en", "Official text.")
+
+    def test_groq_answers_when_gemini_is_rate_limited(self):
+        def post(url, **kwargs):
+            if "generativelanguage" in url:
+                return self.response(429, {"error": {}})
+            return self.response(200, {"choices": [{"message": {"content": "From Groq."}}]})
+        with self.mock.patch.object(self.ai.requests, "post", side_effect=post):
+            self.assertEqual(self.summary("Fallback bill"), "From Groq.")
+
+    def test_failure_is_not_cached(self):
+        down = self.mock.patch.object(self.ai.requests, "post",
+                                      side_effect=ConnectionError("url /v1beta?key=SECRETKEY"))
+        with down:
+            first = self.summary("Retry bill")
+        self.assertTrue(first.startswith("⚠️"))
+        self.assertNotIn("SECRETKEY", first)
+        ok = self.response(200, {"candidates": [{"content": {"parts": [{"text": "Works now."}]}}]})
+        with self.mock.patch.object(self.ai.requests, "post", return_value=ok):
+            self.assertEqual(self.summary("Retry bill"), "Works now.")
+
+
 if __name__ == "__main__":
     unittest.main()

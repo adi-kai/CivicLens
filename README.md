@@ -81,7 +81,7 @@ api_key = "YOUR_OPENSTATES_API_KEY"     # required
 api_key = "YOUR_GEMINI_API_KEY"         # optional — bill summaries + candidate research
 
 [groq]
-api_key = "YOUR_GROQ_API_KEY"           # optional — candidate research fallback
+api_key = "YOUR_GROQ_API_KEY"           # optional — bill summary + candidate research fallback
 
 [tavily]
 api_key = "YOUR_TAVILY_API_KEY"         # optional — candidate research fallback
@@ -147,8 +147,9 @@ terms-of-service.html
 ## Architecture Notes
 
 - **No data storage** — addresses entered by users are passed directly to geocoding and representative APIs and discarded. Nothing is written to a database or log.
-- **Caching** — results are cached in memory with `st.cache_data`: geocoding for 24 hours, governors for 6 hours, representatives and district boundaries for 1 hour, bills for 30 minutes. Failed map-boundary loads aren't cached, so the next click retries.
-- **Rate limiting** — Gemini candidate research is rate-limited per session (5 calls/minute) with automatic fallback to Groq + Tavily.
+- **Caching** — results are cached in memory with `st.cache_data`: geocoding for 24 hours, governors for 6 hours, representatives and district boundaries for 1 hour, bills for 30 minutes. Failed map-boundary loads and failed AI calls aren't cached, so the next click retries.
+- **Rate limiting** — Gemini candidate research is rate-limited per session (5 calls/minute) with automatic fallback to Groq + Tavily. Bill summaries also fall back to Groq when Gemini is unavailable.
+- **Grounded bill summaries** — summaries are written from the bill's official abstract when the state publishes one, and from the title alone (labeled as such) when it doesn't.
 - **No invented candidates** — both AI prompts tell the model to report that no 2026 election was found rather than make up candidates, and the fallback may only use facts from its search results.
 - **TIGERweb resilience** — district boundary fetching tries multiple field-name variants (`STATE='37'`, `STUSPS='NC'`) to handle Census API schema changes across years.
 - **Federal rep data** — OpenStates' per-state rosters list state legislators only, so the Rep Map's U.S. House and Senate data come from the public-domain `unitedstates/congress-legislators` dataset.

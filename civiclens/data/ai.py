@@ -17,44 +17,121 @@ IMPORTANT: Write all of your text in Spanish — including the "no 2026 election
 def _msg(lang: str, en: str, es: str) -> str:
     return es if lang == "es" else en
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def get_bill_summary(bill_id: str, title: str, latest_action: str, state_name: str = "",
-                     lang: str = "en") -> str:
-    if not GEMINI_KEY:
-        return _msg(lang, "⚠️ Gemini API key not set.", "⚠️ No se configuró la clave de API de Gemini.")
-    language = "plain Spanish" if lang == "es" else "plain English"
-    prompt = f"""You are a nonpartisan civic education assistant for a voter app.
+class AIError(Exception):
+    """Raised inside a cached AI call so a failure isn't cached; the uncached wrapper
+    turns it into a message (or the next fallback) and the next click retries."""
 
-Summarize this {state_name or "state"} bill in 2-3 sentences of {language} that a first-time voter can understand.
-Be strictly factual and nonpartisan. Do not editorialize or take sides.
-
-Bill: {title}
-Latest action: {latest_action}
-
-Respond with only the summary — no intro, no labels, no markdown."""
+def _gemini_text(prompt: str, generation_config: dict, tools: list | None = None, timeout: int = 20) -> str:
+    body = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": generation_config}
+    if tools:
+        body["tools"] = tools
     try:
         r = requests.post(
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-            params={"key": GEMINI_KEY},
-            json={
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.1, "maxOutputTokens": 500},
-            },
-            timeout=20,
+            params={"key": GEMINI_KEY}, json=body, timeout=timeout,
         )
-        if r.status_code != 200:
-            return _msg(lang, f"⚠️ Gemini error {r.status_code}", f"⚠️ Error de Gemini {r.status_code}")
-        parts = r.json().get("candidates", [{}])[0].get("content", {}).get("parts", [])
-        return "".join(p.get("text", "") for p in parts).strip()
     except Exception as e:
-        return f"⚠️ Error: {e}"
+        # Only the type: a requests error message includes the URL, and the key is in it
+        raise AIError(f"Gemini: {type(e).__name__}")
+    if r.status_code != 200:
+        raise AIError(f"Gemini {r.status_code}")
+    parts = r.json().get("candidates", [{}])[0].get("content", {}).get("parts", [])
+    text = "".join(p.get("text", "") for p in parts if "text" in p).strip()
+    if not text:
+        raise AIError("Gemini returned empty")
+    return text
+
+def _groq_text(system: str, prompt: str, max_tokens: int, timeout: int = 30) -> str:
+    try:
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {GROQ_KEY}"},
+            json={
+                "model": "openai/gpt-oss-120b",
+                "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+                "temperature": 0.1,
+                "max_tokens": max_tokens,
+            },
+            timeout=timeout,
+        )
+        text = r.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        raise AIError(f"Groq: {type(e).__name__}")
+    text = (text or "").strip()
+    if not text:
+        raise AIError("Groq returned empty")
+    return text
+
+def _bill_summary_prompt(title: str, latest_action: str, state_name: str, lang: str, abstract: str) -> str:
+    language = "plain Spanish" if lang == "es" else "plain English"
+    # With only a title to go on, the model used to invent provisions, so it's told to stay within it
+    if abstract:
+        source = f"""Summarize this {state_name or "state"} bill in 2-3 sentences of {language} that a first-time voter can understand.
+Use ONLY the official summary below. Do not add any detail, amount, date, or effect it doesn't state.
+
+Bill: {title}
+Latest action: {latest_action}
+Official summary: {abstract[:4000]}"""
+    else:
+        source = f"""Only this {state_name or "state"} bill's title is available, not its text or an official summary.
+In 1-2 sentences of {language} that a first-time voter can understand, explain what the title says the bill is about.
+Do not guess at specific provisions, amounts, dates, or effects the title doesn't state.
+If the title is too general to tell (for example, chamber rules or a list of local changes), say so plainly.
+
+Bill: {title}
+Latest action: {latest_action}"""
+    return f"""You are a nonpartisan civic education assistant for a voter app.
+
+{source}
+
+Be strictly factual and nonpartisan. Do not editorialize or take sides.
+Respond with only the summary — no intro, no labels, no markdown."""
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _gemini_bill_summary(prompt: str) -> str:
+    # Thinking tokens count against maxOutputTokens and were cutting summaries off
+    return _gemini_text(prompt, {"temperature": 0.1, "maxOutputTokens": 500,
+                                 "thinkingConfig": {"thinkingBudget": 0}})
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _groq_bill_summary(prompt: str) -> str:
+    # GPT-OSS reasons before answering, and those tokens count against max_tokens too
+    return _groq_text("You are a nonpartisan civic education assistant. Reply with only the summary.",
+                      prompt, max_tokens=1500)
+
+def get_bill_summary(bill_id: str, title: str, latest_action: str, state_name: str = "",
+                     lang: str = "en", abstract: str = "") -> str:
+    """Gemini first, then Groq (the free Gemini tier allows only a few requests a day).
+    Uncached wrapper: failures come back as a message and aren't cached."""
+    prompt = _bill_summary_prompt(title, latest_action, state_name, lang, abstract)
+    errors = []
+    for key, summarize in ((GEMINI_KEY, _gemini_bill_summary), (GROQ_KEY, _groq_bill_summary)):
+        if not key:
+            continue
+        try:
+            return summarize(prompt)
+        except AIError as e:
+            errors.append(str(e))
+    if not errors:
+        return _msg(lang, "⚠️ No AI API key is set (Gemini or Groq).",
+                    "⚠️ No se configuró ninguna clave de API de IA (Gemini o Groq).")
+    return _msg(lang, "⚠️ Summary unavailable right now ({err}). Please try again in a minute.",
+                "⚠️ El resumen no está disponible ahora ({err}). Inténtalo de nuevo en un minuto.").format(
+        err="; ".join(errors))
 
 # ── Candidates — Gemini 2.5 Flash with Google Search grounding ───────────────
-@st.cache_data(ttl=3600, show_spinner=False)
-def get_candidate_info(race: str, state_name: str, lang: str = "en") -> str:
+def get_candidate_info(race: str, state_name: str, lang: str = "en") -> str | None:
+    """Returns Gemini's candidate HTML, or None so the tab switches to the Groq + Tavily
+    fallback. Uncached wrapper, so a failure is retried on the next click."""
     if not GEMINI_KEY:
         return candidate_info_fallback(race, state_name, lang)
+    try:
+        return _gemini_candidate_info(race, state_name, lang)
+    except AIError:
+        return None
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def _gemini_candidate_info(race: str, state_name: str, lang: str) -> str:
     prompt = f"""You are a nonpartisan civic information assistant for CivicLens, a voter education app.
 
 Search and find all major candidates running in the 2026 {state_name} {race} election.
@@ -94,46 +171,32 @@ Be strictly factual and nonpartisan. List ALL major-party candidates."""
     if lang == "es":
         prompt += SPANISH_OUTPUT
 
-    try:
-        for attempt in range(2):
-            r = requests.post(
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-                params={"key": GEMINI_KEY},
-                json={
-                    "contents": [{"parts": [{"text": prompt}]}],
-                    "tools": [{"google_search": {}}],
-                    "generationConfig": {"temperature": 0.1}
-                },
-                timeout=45
-            )
-            if r.status_code == 503:
-                if attempt == 0:
-                    time.sleep(4)
-                    continue
-                raise Exception("Gemini 503")
-            if r.status_code != 200:
-                raise Exception(f"Gemini {r.status_code}: {r.text[:200]}")
-
-            data  = r.json()
-            parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-            html  = "".join(p.get("text", "") for p in parts if "text" in p)
-            html  = re.sub(r"```html?\n?|```\n?", "", html).strip()
-            if html:
-                return html
-            raise Exception("Gemini returned empty")
-
-    except Exception:
-        return None  # the tab switches to the Groq + Tavily fallback
+    for attempt in range(2):
+        try:
+            html = _gemini_text(prompt, {"temperature": 0.1}, tools=[{"google_search": {}}], timeout=45)
+            return re.sub(r"```html?\n?|```\n?", "", html).strip()
+        except AIError as e:
+            if attempt == 0 and str(e) == "Gemini 503":
+                time.sleep(4)
+                continue
+            raise
 
 def candidate_info_fallback(race: str, state_name: str, lang: str = "en") -> str:
-    """Groq (GPT-OSS 120B) + Tavily search — runs when Gemini is down."""
+    """Groq (GPT-OSS 120B) + Tavily search — runs when Gemini is down. Uncached wrapper:
+    failures come back as a message and aren't cached."""
     if not GROQ_KEY or not TAVILY_KEY:
         return '<p style="color:#c0392b;">' + _msg(
             lang,
             "⚠️ Gemini is currently overloaded and no fallback keys are configured. Please try again in a minute.",
             "⚠️ Gemini está saturado en este momento y no hay claves de respaldo configuradas. Inténtalo de nuevo en un minuto.",
         ) + "</p>"
+    try:
+        return _candidate_info_fallback_cached(race, state_name, lang)
+    except AIError as e:
+        return '<p style="color:#c0392b;">' + str(e) + "</p>"
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def _candidate_info_fallback_cached(race: str, state_name: str, lang: str) -> str:
     # Step 1 — Tavily search for live candidate data
     try:
         # First search: who's running
@@ -171,9 +234,8 @@ def candidate_info_fallback(race: str, state_name: str, lang: str = "en") -> str
             search_context += f"\n\nSource: {result.get('title')}\n{result.get('content', '')}"
 
     except Exception as e:
-        return '<p style="color:#c0392b;">' + _msg(
-            lang, f"⚠️ Search unavailable: {e}. Please try again.",
-            f"⚠️ La búsqueda no está disponible: {e}. Inténtalo de nuevo.") + "</p>"
+        raise AIError(_msg(lang, f"⚠️ Search unavailable: {e}. Please try again.",
+                           f"⚠️ La búsqueda no está disponible: {e}. Inténtalo de nuevo."))
 
     # Step 2 — Groq summarizes the search results
     prompt = f"""Based on the search results below, find all major candidates running in the 2026 {state_name} {race} election.
@@ -218,40 +280,17 @@ Be strictly factual and nonpartisan."""
     if lang == "es":
         prompt += SPANISH_OUTPUT
     try:
-        groq_r = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {GROQ_KEY}"},
-            json={
-                "model": "openai/gpt-oss-120b",
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "You are a nonpartisan civic information assistant. You output ONLY raw HTML — no greetings, no markdown, no explanations, no code fences. Your entire response must be HTML starting with a <div> tag."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                "temperature": 0.1,
-                "max_tokens": 4000,
-            },
-            timeout=30
-        )
-        html = groq_r.json()["choices"][0]["message"]["content"]
-        html = re.sub(r"```html?\n?|```\n?", "", html).strip()
-
-        if not html:
-            raw = groq_r.json()["choices"][0]["message"]["content"]
-            return f'<pre style="font-size:0.75rem">{raw[:500]}</pre>'
-
-        label = ('<p style="font-family:sans-serif; font-size:0.85rem; color:#8a6d00; background:#fff8e1; '
-                 'border-radius:6px; padding:6px 10px; margin-bottom:0.75rem;">'
-                 + _msg(lang, "⚠️ AI-generated from web search. May be incomplete.",
-                        "⚠️ Generado por IA a partir de una búsqueda web. Puede estar incompleto.")
-                 + '</p>')
-        return label + html
-    except Exception as e:
-        return '<p style="color:#c0392b;">' + _msg(
-            lang, f"⚠️ Backup also failed: {e}. Please try again in a minute.",
-            f"⚠️ El respaldo también falló: {e}. Inténtalo de nuevo en un minuto.") + "</p>"
+        html = _groq_text(
+            "You are a nonpartisan civic information assistant. You output ONLY raw HTML — no greetings, "
+            "no markdown, no explanations, no code fences. Your entire response must be HTML starting with a <div> tag.",
+            prompt, max_tokens=4000)
+    except AIError as e:
+        raise AIError(_msg(lang, f"⚠️ Backup also failed: {e}. Please try again in a minute.",
+                           f"⚠️ El respaldo también falló: {e}. Inténtalo de nuevo en un minuto."))
+    html = re.sub(r"```html?\n?|```\n?", "", html).strip()
+    label = ('<p style="font-family:sans-serif; font-size:0.85rem; color:#8a6d00; background:#fff8e1; '
+             'border-radius:6px; padding:6px 10px; margin-bottom:0.75rem;">'
+             + _msg(lang, "⚠️ AI-generated from web search. May be incomplete.",
+                    "⚠️ Generado por IA a partir de una búsqueda web. Puede estar incompleto.")
+             + '</p>')
+    return label + html

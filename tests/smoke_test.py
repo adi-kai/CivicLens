@@ -69,6 +69,12 @@ BILLS = {"results": [{
     "sponsorships": [{"primary": True, "name": "Jay Sponsor",
                       "person": {"name": "Jay Sponsor", "party": "Democratic",
                                  "current_role": {"title": "Senator"}}}],
+    "abstracts": [{"abstract": "Raises teacher pay by 3 percent.", "note": "summary"}],
+}, {
+    # No abstract, like every NC bill, so the summary falls back to the title-only prompt
+    "id": "ocd-bill/2", "identifier": "HB 2", "title": "Senate Rules",
+    "latest_action_description": "Filed", "latest_action_date": "2026-09-02",
+    "openstates_url": "https://openstates.org/nc/bills/HB2", "subject": [], "sponsorships": [],
 }]}
 
 # Includes markup the sanitizer must strip, as if it came from a hostile search result
@@ -146,7 +152,7 @@ def fake_get(url, params=None, **kwargs):
 def fake_post(url, params=None, json=None, **kwargs):
     if "generativelanguage" in url:
         PROMPTS.append(json["contents"][0]["parts"][0]["text"])
-        is_summary = "Summarize" in json["contents"][0]["parts"][0]["text"]
+        is_summary = "civic education assistant" in json["contents"][0]["parts"][0]["text"]
         text = "This bill funds schools." if is_summary else CANDIDATE_HTML
         return FakeResponse({"candidates": [{"content": {"parts": [{"text": text}]}}]})
     if "tavily" in url:
@@ -263,9 +269,15 @@ def rep_map(at):
     return ["Map data loaded", "Party Key"]
 
 def bills(at):
+    PROMPTS.clear()
     go(at, "📋 Bill Tracker")
-    button(at, "✨ Plain-English Summary").click().run()
-    return ["HB 1", "State Senator Jay Sponsor (Democratic)", "This bill funds schools."]
+    for b in [b for b in at.button if b.label == "✨ Plain-English Summary"]:
+        b.click().run()
+    used_abstract = any("Raises teacher pay by 3 percent." in p for p in PROMPTS)
+    return (["HB 1", "State Senator Jay Sponsor (Democratic)", "This bill funds schools.",
+             "Based on the official bill summary.",
+             "Based on the bill title only — no official summary was published for this bill."]
+            + ([] if used_abstract else ["<summary prompt included the abstract>"]))
 
 def compare(at):
     go(at, "🔍 District Compare")
