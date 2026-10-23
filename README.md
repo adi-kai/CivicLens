@@ -12,7 +12,7 @@ Built for the 2026 election cycle.
 
 | My Ballot | My Representatives |
 |---|---|
-| ![Official races and candidates on a Richmond, Virginia ballot](docs/screenshots/my-ballot.png) | ![Governor, U.S. Senators, and U.S. Representative for an address](docs/screenshots/my-representatives.png) |
+| ![Official races and candidates on a Richmond, Virginia ballot](docs/screenshots/my-ballot.png) | ![Governor, U.S. Senators, U.S. Representative, and state legislators for a Raleigh address](docs/screenshots/my-representatives.png) |
 | **Rep Map** | **Deadlines** |
 | ![North Carolina's U.S. House districts colored by party](docs/screenshots/rep-map.png) | ![North Carolina 2026 voting deadlines on ballot-stub date tiles, with sources](docs/screenshots/deadlines.png) |
 
