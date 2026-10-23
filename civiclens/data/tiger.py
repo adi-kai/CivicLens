@@ -1,8 +1,8 @@
 """Census TIGERweb district boundaries."""
-import re
-
 import requests
 import streamlit as st
+
+from civiclens.helpers import district_key
 
 # TIGERweb — current (2025-2026) layer IDs for the Legislative MapServer
 # These layer IDs are national — the same MapServer covers every state, you just
@@ -64,36 +64,22 @@ def fetch_tiger_geojson(layer_id: int, state_fips: str, state_abbr: str = "") ->
 
 def extract_district_key(props: dict, district_field: str = "") -> str:
     """
-    Extract a clean integer district number from a feature's properties.
-    Pass district_field to read the correct field directly (CD119, SLDU, SLDL).
-    Falls back to a priority-ordered scan if the field is missing or empty.
+    The feature's district as a district_key(), to match build_rep_lookup().
+    BASENAME comes first: it's the district's name as the state writes it ("I", "Addison-1",
+    "Hillsborough 10", "Third Middlesex"), which is how OpenStates spells it too. The code
+    fields don't match for named districts (Alaska's SLDU is "00I", Vermont's "ADD",
+    Massachusetts' "D15"), and CD119 has come back empty on the U.S. House layer.
+    Pass district_field (CD119, SLDU, SLDL) as the next choice; legacy field names follow.
     """
-    # Try the known correct field for this layer first
-    if district_field and props.get(district_field) not in (None, "", "None"):
-        raw = str(props[district_field]).strip()
-        try:
-            return str(int(raw))
-        except ValueError:
-            m = re.search(r"\d+", raw)
-            if m:
-                return str(int(m.group()))
-
-    # Fallback scan (catches legacy field names if Census ever renames again)
-    fallback = [
-        props.get("CD119"), props.get("CD119FP"),
-        props.get("CD118"), props.get("CD118FP"),
-        props.get("CDFP"),  props.get("CD"),
-        props.get("SLDU"),  props.get("SLDUST"),
-        props.get("SLDL"),  props.get("SLDLST"),
-        props.get("BASENAME"), props.get("NAME"),
-    ]
-    for val in fallback:
-        if val is not None and str(val).strip() not in ("", "None"):
-            raw = str(val).strip()
-            try:
-                return str(int(raw))
-            except ValueError:
-                m = re.search(r"\d+", raw)
-                if m:
-                    return str(int(m.group()))
+    fields = ["BASENAME", district_field,
+              "CD119", "CD119FP", "CD118", "CD118FP", "CDFP", "CD",
+              "SLDU", "SLDUST", "SLDL", "SLDLST", "NAME"]
+    for field in fields:
+        key = district_key(props.get(field)) if field else ""
+        if key:
+            return key
     return ""
+
+def is_undefined_area(props: dict) -> bool:
+    """Census adds a shape for water that's in no district ("State House Districts not defined")."""
+    return "NOT DEFINED" in str(props.get("BASENAME") or props.get("NAME") or "").upper()

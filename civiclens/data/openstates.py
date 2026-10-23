@@ -27,7 +27,7 @@ def get_state_reps_by_chamber(state_abbr: str, chamber: str) -> tuple:
     slugs are just the lowercase state abbreviation."""
     results = []
     jurisdiction = (state_abbr or DEFAULT_STATE).lower()
-    for page in range(1, 6):  # up to 250 reps, more than enough
+    for page in range(1, 11):  # up to 500 reps; New Hampshire's House alone has 400
         try:
             r = requests.get(
                 "https://v3.openstates.org/people",
@@ -38,9 +38,12 @@ def get_state_reps_by_chamber(state_abbr: str, chamber: str) -> tuple:
             )
             if r.status_code != 200:
                 return results, f"HTTP {r.status_code}: {r.text[:200]}"
-            batch = r.json().get("results", [])
+            data = r.json()
+            batch = data.get("results", [])
             results.extend(batch)
-            if len(batch) < 50:
+            # Asking past the last page is a 404, so a chamber of exactly 50 (NC's Senate)
+            # has to stop on max_page rather than wait for a short page
+            if len(batch) < 50 or page >= (data.get("pagination") or {}).get("max_page", page + 1):
                 break  # last page
         except Exception as e:
             return results, str(e)

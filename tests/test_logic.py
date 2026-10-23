@@ -11,7 +11,7 @@ import support  # noqa: F401  (fake API keys; must come before civiclens imports
 
 from civiclens.data.governors import commons_thumb, normalize_party  # noqa: E402
 from civiclens.data.tiger import extract_district_key  # noqa: E402
-from civiclens.helpers import (build_rep_lookup, esc, get_chamber_label, html_block,  # noqa: E402
+from civiclens.helpers import (build_rep_lookup, district_key, esc, get_chamber_label, html_block,  # noqa: E402
                                party_css, sanitize_ai_html, state_legislator_title)
 from civiclens.states import get_candidate_races  # noqa: E402
 from civiclens.theme import theme_ai_html  # noqa: E402
@@ -32,8 +32,11 @@ class DistrictMatching(unittest.TestCase):
         self.assertEqual(sorted(lookup), ["14", "37", "5"])
 
     def test_rep_lookup_keeps_letter_districts(self):
-        # Matching is number-based; a district with no digits is kept as written
         self.assertIn("A", build_rep_lookup([rep("A")]))
+
+    def test_rep_lookup_keeps_every_member_of_a_district(self):
+        lookup = build_rep_lookup([rep("Addison-1"), rep("Addison-1"), rep("Addison-2")])
+        self.assertEqual(len(lookup["ADDISON1"]), 2)
 
     def test_rep_lookup_skips_missing_district(self):
         self.assertEqual(build_rep_lookup([rep("")]), {})
@@ -53,6 +56,38 @@ class DistrictMatching(unittest.TestCase):
     def test_both_sides_agree(self):
         shape_key = extract_district_key({"SLDL": "099"}, "SLDL")
         self.assertIn(shape_key, build_rep_lookup([rep("99", org="lower")]))
+
+    def test_named_districts_match(self):
+        # Census BASENAME vs OpenStates district, as each spelled them in October 2026
+        pairs = [
+            ({"SLDU": "00I", "BASENAME": "I"}, "SLDU", "I"),                               # Alaska
+            ({"SLDU": "CHS", "BASENAME": "Chittenden South East"}, "SLDU", "Chittenden Southeast"),
+            ({"SLDL": "A-1", "BASENAME": "Addison-1"}, "SLDL", "Addison-1"),                # Vermont
+            ({"SLDL": "510", "BASENAME": "Hillsborough 10"}, "SLDL", "Hillsborough 10"),    # New Hampshire
+            ({"SLDL": "201", "BASENAME": "Belknap 01"}, "SLDL", "Belknap 1"),
+            ({"SLDU": "D01", "BASENAME": "Norfolk, Plymouth Bristol"}, "SLDU", "Norfolk, Plymouth and Bristol"),
+            ({"SLDL": "141", "BASENAME": "19th Suffolk"}, "SLDL", "19th Suffolk"),          # Massachusetts
+            ({"SLDU": "002", "BASENAME": "02"}, "SLDU", "2"),
+        ]
+        for props, field, person_district in pairs:
+            with self.subTest(person_district):
+                self.assertIn(extract_district_key(props, field), build_rep_lookup([rep(person_district)]))
+
+    def test_named_districts_dont_collide(self):
+        # Number-only matching turned these into "3" and "1"
+        keys = {extract_district_key({"BASENAME": b}, "SLDL") for b in ("Orleans-3", "Addison-3", "Addison-1")}
+        self.assertEqual(len(keys), 3)
+
+    def test_at_large_house_seat(self):
+        shape_key = extract_district_key({"CD119": None, "BASENAME": "Congressional District (at Large)"}, "CD119")
+        self.assertEqual(shape_key, "0")
+        self.assertIn(shape_key, build_rep_lookup([rep("WY-0")]))
+
+    def test_district_key(self):
+        self.assertEqual(district_key("NC-14"), "14")
+        self.assertEqual(district_key("Congressional District 10"), "10")
+        self.assertEqual(district_key("State House District Hillsborough 10"), "HILLSBOROUGH10")
+        self.assertEqual(district_key("None"), "")
 
 
 class Labels(unittest.TestCase):

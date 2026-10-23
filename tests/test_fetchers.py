@@ -182,6 +182,19 @@ class OpenStatesRoster(unittest.TestCase):
         self.assertEqual((len(reps), err, get.call_count), (70, "", 2))
         self.assertEqual(get.call_args.kwargs["params"]["jurisdiction"], "nc")
 
+    def test_stops_at_max_page(self):
+        # A chamber of exactly 50: asking for page 2 would be a 404
+        full = response(200, {"results": [{}] * 50, "pagination": {"page": 1, "max_page": 1}})
+        with mock.patch.object(openstates.requests, "get", side_effect=[full]) as get:
+            reps, err = openstates.get_state_reps_by_chamber("NC", "upper")
+        self.assertEqual((len(reps), err, get.call_count), (50, "", 1))
+
+    def test_reads_past_250_members(self):
+        pages = [response(200, {"results": [{}] * 50, "pagination": {"max_page": 8}})] * 7 +                 [response(200, {"results": [{}] * 32, "pagination": {"max_page": 8}})]
+        with mock.patch.object(openstates.requests, "get", side_effect=pages):
+            reps, err = openstates.get_state_reps_by_chamber("NH", "lower")
+        self.assertEqual((len(reps), err), (382, ""))
+
     def test_partial_results_with_error(self):
         pages = [response(200, {"results": [{}] * 50}), response(429, text="Too Many Requests")]
         with mock.patch.object(openstates.requests, "get", side_effect=pages):
@@ -222,7 +235,7 @@ class DistrictLayer(unittest.TestCase):
     def test_matched_district_colored_and_escaped(self):
         rep = {"name": "A <b>Rep</b>", "party": "Republican",
                "current_role": {"district": "1"}, "jurisdiction": {"classification": "state"}}
-        color, tooltip = self.layer("01", {"1": rep})
+        color, tooltip = self.layer("01", {"1": [rep]})
         self.assertEqual(color, "#c0392b")
         self.assertIn("A &lt;b&gt;Rep&lt;/b&gt;", tooltip)
 
@@ -230,6 +243,19 @@ class DistrictLayer(unittest.TestCase):
         color, tooltip = self.layer("02", {})
         self.assertEqual(color, "#888888")
         self.assertIn("No data", tooltip)
+
+    def test_members_of_one_district_all_shown(self):
+        reps = [{"name": n, "party": p, "current_role": {"district": "1"}} for n, p in
+                (("Ann", "Democratic"), ("Bob", "Republican"))]
+        color, tooltip = self.layer("01", {"1": reps})
+        self.assertEqual(color, "#888888")  # split delegation: neither party's color
+        self.assertIn("Ann (Democratic), Bob (Republican)", tooltip)
+
+    def test_undefined_water_area_skipped(self):
+        from civiclens.tabs.rep_map import build_district_layer
+        feature = self.shape("ZZZ")
+        feature["properties"]["BASENAME"] = "State House Districts not defined"
+        self.assertEqual(len(build_district_layer({"features": [feature]}, {}, "Layer", "SLDL")._children), 0)
 
     def test_empty_geojson(self):
         from civiclens.tabs.rep_map import build_district_layer

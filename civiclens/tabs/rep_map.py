@@ -12,7 +12,7 @@ from civiclens.data.governors import get_governor, governor_links_html
 from civiclens.data.openstates import get_state_reps_by_chamber
 from civiclens.data.tiger import (LAYER_STATE_HOUSE, LAYER_STATE_SENATE, LAYER_US_HOUSE,
                                   US_STATES_GEOJSON_URL, extract_district_key,
-                                  fetch_tiger_geojson)
+                                  fetch_tiger_geojson, is_undefined_area)
 from civiclens.helpers import (address_input, build_rep_lookup, esc, get_chamber_label,
                                html_block, party_color, party_fill, party_label, plain,
                                show_searched_address)
@@ -27,23 +27,44 @@ def build_district_layer(geojson: dict, rep_lookup: dict, layer_name: str,
         return fg
     for feature in geojson["features"]:
         props     = feature.get("properties", {})
+        if is_undefined_area(props):
+            continue
         dist_key  = extract_district_key(props, district_field)
-        rep       = rep_lookup.get(dist_key, {})
-        rep_name  = rep.get("name", t("No data"))
-        rep_party = rep.get("party", "Unknown")
-        rep_label = get_chamber_label(rep) if rep else ""
-        rep_photo = rep.get("image", "")
-        district  = t("District {district}", district=dist_key)
-        fill, opacity = party_fill(rep_party)
-        photo_html = (f"<img src='{esc(rep_photo)}' alt='{esc(rep_name)}' width='55' "
-                      f"style='border-radius:50%;float:right;margin-left:8px'/>" if rep_photo else "")
+        reps      = rep_lookup.get(dist_key, [])
+        if dist_key == "0":
+            district = t("U.S. House At-Large")
+        else:
+            # Named districts ("Addison-1", "Third Middlesex") show as the state writes them
+            name = dist_key if dist_key.isdigit() else (props.get("BASENAME") or dist_key)
+            district = t("District {district}", district=name)
+        # A district with several members is colored by party only when they all share one
+        parties = {rep.get("party", "Unknown") for rep in reps}
+        fill, opacity = party_fill(parties.pop() if len(parties) == 1 else "")
+        if reps:
+            tip_reps = ", ".join(f"{rep.get('name', '')} ({party_label(rep.get('party', 'Unknown'))})"
+                                 for rep in reps)
+        else:
+            tip_reps = t("No data")
+        rep_blocks = []
+        for rep in reps or [{}]:
+            rep_name  = rep.get("name", t("No data"))
+            rep_party = rep.get("party", "Unknown")
+            rep_photo = rep.get("image", "")
+            photo_html = (f"<img src='{esc(rep_photo)}' alt='{esc(rep_name)}' width='55' "
+                          f"style='border-radius:50%;float:right;margin-left:8px'/>" if rep_photo else "")
+            party_html = (f"<span style=\"color:{party_color(rep_party)};font-weight:600\">"
+                          f"{esc(party_label(rep_party))}</span>" if rep else "")
+            rep_blocks.append(f"""
+            <div style="overflow:hidden;margin-top:6px">
+                {photo_html}
+                <strong>{esc(rep_name)}</strong><br>
+                <em style="color:#555;font-size:12px">{esc(get_chamber_label(rep) if rep else "")}</em><br>
+                {party_html}
+            </div>""")
         popup_html = f"""
         <div style="font-family:sans-serif;min-width:200px;padding:4px">
-            {photo_html}
-            <strong style="font-size:13px">{esc(district)}</strong><br>
-            <strong>{esc(rep_name)}</strong><br>
-            <em style="color:#555;font-size:12px">{esc(rep_label)}</em><br>
-            <span style="color:{party_color(rep_party)};font-weight:600">{esc(party_label(rep_party))}</span>
+            <strong style="font-size:13px">{esc(district)}</strong>
+            {"".join(rep_blocks)}
         </div>"""
         try:
             folium.GeoJson(
@@ -54,7 +75,7 @@ def build_district_layer(geojson: dict, rep_lookup: dict, layer_name: str,
                 highlight_function=lambda f, fill=fill: {
                     "fillColor": fill, "fillOpacity": 0.45, "color": "#333", "weight": 2,
                 },
-                tooltip=esc(f"{district} — {rep_name} ({party_label(rep_party)})"),
+                tooltip=esc(f"{district} — {tip_reps}"),
                 popup=folium.Popup(popup_html, max_width=260),
             ).add_to(fg)
         except Exception:

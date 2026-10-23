@@ -163,7 +163,7 @@ terms-of-service.html
 
 ## Known Limitations
 
-- District-to-representative matching on the Rep Map is number-based. States with lettered or named legislative districts (e.g. Alaska's State Senate, some New England House districts) may show districts as "No data" or match them incorrectly.
+- New Hampshire's floterial House districts (which overlap regular districts) have no Census boundary, so those members don't appear on the Rep Map.
 - Exact voting deadlines are listed for five states (NC, SC, VA, TN, GA). They must be re-verified before each election.
 
 ---

@@ -153,17 +153,34 @@ def party_label(party: str) -> str:
     """Party name for display. Styling helpers keep using the English name."""
     return t(party or "Unknown")
 
+def district_key(raw) -> str:
+    """Normalizes a district name so Census shapes and OpenStates / congress-legislators
+    people can be joined on it. Numbers lose leading zeros and state prefixes
+    ("037", "NC-14", "District 14" → "37", "14", "14"); a single at-large seat is "0".
+    Named districts keep their words, ignoring case, spacing, punctuation, "and", and
+    zero-padding: "Chittenden Southeast" / "Chittenden South East", "Belknap 01" /
+    "Belknap 1", "Norfolk, Plymouth and Bristol" / "Norfolk Plymouth Bristol"."""
+    s = str(raw or "").strip().upper()
+    if s in ("", "NONE"):
+        return ""
+    if "AT LARGE" in s or "AT-LARGE" in s:
+        return "0"
+    s = re.sub(r"^[A-Z]{2}-(?=\d)", "", s)
+    # "Congressional District 10", "State House District Hillsborough 10"
+    s = re.sub(r"^(?:.*\s)?DISTRICT\s+(?=\S)", "", s)
+    if s.isdigit():
+        return str(int(s))
+    s = re.sub(r"\bAND\b", " ", s)
+    s = re.sub(r"\b0+(?=\d)", "", s)
+    return re.sub(r"[^A-Z0-9]+", "", s)
+
 def build_rep_lookup(reps: list) -> dict:
+    """{district_key: [reps]}. A list, because many states elect more than one member
+    per district (Vermont, New Hampshire, Arizona, New Jersey, Washington, ...)."""
     lookup = {}
     for rep in reps:
         roles = rep.get("current_role", {}) or {}
-        dist  = str(roles.get("district", "")).strip()
-        # Strip any state prefix (e.g. "NC-14" → "14", "NC-" → "")
-        dist = re.sub(r"^[A-Z]{2}-", "", dist.upper()).strip()
-        # Extract the numeric part and convert to int then str to drop leading zeros
-        # e.g. "037" → "37", "014" → "14", "14" → "14"
-        m = re.search(r"\d+", dist)
-        key = str(int(m.group())) if m else dist
+        key = district_key(roles.get("district", ""))
         if key:
-            lookup[key] = rep
+            lookup.setdefault(key, []).append(rep)
     return lookup
