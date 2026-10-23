@@ -10,7 +10,7 @@ import unittest
 import support  # noqa: F401  (fake API keys; must come before civiclens imports)
 
 from civiclens.data.governors import commons_thumb, normalize_party  # noqa: E402
-from civiclens.data.tiger import extract_district_key  # noqa: E402
+from civiclens.data.tiger import extract_district_key, geojson_bounds  # noqa: E402
 from civiclens.helpers import (build_rep_lookup, district_key, esc, get_chamber_label, html_block,  # noqa: E402
                                party_css, sanitize_ai_html, state_legislator_title)
 from civiclens.states import get_candidate_races  # noqa: E402
@@ -88,6 +88,24 @@ class DistrictMatching(unittest.TestCase):
         self.assertEqual(district_key("Congressional District 10"), "10")
         self.assertEqual(district_key("State House District Hillsborough 10"), "HILLSBOROUGH10")
         self.assertEqual(district_key("None"), "")
+
+
+class MapBounds(unittest.TestCase):
+    @staticmethod
+    def geo(*rings, kind="Polygon"):
+        return {"features": [{"geometry": {"type": kind, "coordinates": ring}} for ring in rings]}
+
+    def test_box_around_every_layer(self):
+        a = self.geo([[[-73.4, 42.7], [-71.5, 45.0], [-72.0, 43.0]]])
+        b = self.geo([[[[-74.0, 42.0], [-73.0, 43.0]]]], kind="MultiPolygon")
+        self.assertEqual(geojson_bounds(a, None, b), [[42.0, -74.0], [45.0, -71.5]])
+
+    def test_alaska_across_the_date_line(self):
+        alaska = self.geo([[[-150.0, 61.0], [172.5, 52.9], [-130.0, 55.0]]])
+        self.assertEqual(geojson_bounds(alaska), [[52.9, -187.5], [61.0, -130.0]])
+
+    def test_nothing_loaded(self):
+        self.assertEqual(geojson_bounds(None, {}, {"features": []}), [])
 
 
 class Labels(unittest.TestCase):

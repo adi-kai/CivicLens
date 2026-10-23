@@ -83,3 +83,25 @@ def extract_district_key(props: dict, district_field: str = "") -> str:
 def is_undefined_area(props: dict) -> bool:
     """Census adds a shape for water that's in no district ("State House Districts not defined")."""
     return "NOT DEFINED" in str(props.get("BASENAME") or props.get("NAME") or "").upper()
+
+def geojson_bounds(*geojsons) -> list:
+    """[[south, west], [north, east]] around every feature, for folium's fit_bounds; [] if none.
+    Alaska's western Aleutians cross the 180th meridian (positive longitudes), which would
+    stretch the box around the whole world, so eastern-hemisphere points count as below -180."""
+    lats, lngs = [], []
+
+    def walk(coords):
+        if coords and isinstance(coords[0], (int, float)):
+            lng, lat = coords[0], coords[1]
+            lngs.append(lng - 360 if lng > 0 else lng)
+            lats.append(lat)
+        else:
+            for c in coords or []:
+                walk(c)
+
+    for geo in geojsons:
+        for feature in (geo or {}).get("features", []):
+            walk((feature.get("geometry") or {}).get("coordinates"))
+    if not lats:
+        return []
+    return [[min(lats), min(lngs)], [max(lats), max(lngs)]]

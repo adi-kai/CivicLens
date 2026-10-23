@@ -12,7 +12,7 @@ from civiclens.data.governors import get_governor, governor_links_html
 from civiclens.data.openstates import get_state_reps_by_chamber
 from civiclens.data.tiger import (LAYER_STATE_HOUSE, LAYER_STATE_SENATE, LAYER_US_HOUSE,
                                   US_STATES_GEOJSON_URL, extract_district_key,
-                                  fetch_tiger_geojson, is_undefined_area)
+                                  fetch_tiger_geojson, geojson_bounds, is_undefined_area)
 from civiclens.helpers import (address_input, build_rep_lookup, esc, get_chamber_label,
                                html_block, party_color, party_fill, party_label, plain,
                                show_searched_address)
@@ -312,6 +312,13 @@ def render():
                 location=[lat, lng], popup=plain(t("📍 Your Address")), tooltip=t("You are here"),
                 icon=folium.Icon(color="black", icon="home", prefix="fa"),
             ).add_to(m)
+
+        # With no address, zoom to fit the state rather than a fixed zoom that leaves small
+        # states tiny and cuts off large ones
+        if not lat:
+            bounds = geojson_bounds(state_outline_geo, geojson_us_house, geojson_state_senate, geojson_state_house)
+            if bounds:
+                m.fit_bounds(bounds)
 
         folium.LayerControl(collapsed=False).add_to(m)
         st.markdown(f"""
