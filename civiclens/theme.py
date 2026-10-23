@@ -237,6 +237,10 @@ def apply_theme(key: str):
     [data-baseweb="tab-highlight"] {{ background-color: var(--cl-mark) !important; }}
     [data-testid="stSidebar"] {{ background: var(--cl-paper); border-right: 1px solid var(--cl-ink); }}
     *:focus-visible {{ outline: 3px solid var(--cl-accent) !important; outline-offset: 2px; }}
+    /* Text boxes and dropdowns show focus on their whole border instead (below). Without this
+       the outline lands on the small inner field and draws a box around the text cursor. */
+    [data-baseweb="input"] input:focus-visible, [data-baseweb="textarea"] textarea:focus-visible,
+    [data-baseweb="select"] input:focus-visible {{ outline: none !important; }}
 
     /* Buttons: square. Primary is filled ink, secondary is outlined. */
     .stButton button, .stFormSubmitButton button {{
@@ -272,6 +276,8 @@ def apply_theme(key: str):
     }}
     [data-baseweb="input"] input, [data-baseweb="textarea"] textarea,
     [data-baseweb="select"] div {{ color: var(--cl-ink) !important; caret-color: var(--cl-ink); }}
+    /* Dropdowns aren't typed into (type-to-filter still works), so no blinking cursor */
+    [data-baseweb="select"] input {{ caret-color: transparent !important; }}
     [data-baseweb="input"] input::placeholder, [data-baseweb="textarea"] textarea::placeholder {{
         color: var(--cl-muted) !important;
     }}

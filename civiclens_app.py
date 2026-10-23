@@ -9,7 +9,7 @@ import streamlit as st
 st.set_page_config(page_title="CivicLens", layout="wide", page_icon="🗳️")
 
 from civiclens.helpers import plain  # noqa: E402
-from civiclens.i18n import LANG_KEY, LANGUAGES, label_func, t  # noqa: E402
+from civiclens.i18n import LANG_KEY, LANGUAGES, label_func, t, translate  # noqa: E402
 from civiclens.tabs import (ballot, bills, candidates, compare, deadlines, home,  # noqa: E402
                             my_reps, polling, rep_map)
 from civiclens.theme import PALETTES, apply_base_styles, apply_theme  # noqa: E402
@@ -32,9 +32,24 @@ st.sidebar.markdown(
     unsafe_allow_html=True,
 )
 
+# Keyed widgets whose displayed labels are translated
+TRANSLATED_CHOICES = ("menu", "theme")
+
+
+def keep_translated_choices():
+    """Streamlit 1.58 remembers a radio or selectbox choice as its displayed label. Those
+    labels change with the language, so after a switch the old label matched no option and
+    the widget handed back the raw label ("Deadlines" instead of "📅 Deadlines"), crashing
+    the page. Re-saving each choice by its key before the rerun makes Streamlit send the
+    new language's labels instead."""
+    for key in TRANSLATED_CHOICES:
+        if key in st.session_state:
+            st.session_state[key] = st.session_state[key]
+
+
 # Labeled in both languages so a Spanish speaker can find it before switching
 lang_choice = st.sidebar.selectbox("Language / Idioma", list(LANGUAGES), key=LANG_KEY,
-                                   format_func=LANGUAGES.get)
+                                   format_func=LANGUAGES.get, on_change=keep_translated_choices)
 st.query_params[LANG_KEY] = lang_choice
 
 SECTIONS = {
@@ -53,6 +68,10 @@ SECTIONS = {
 nav_label = label_func()
 menu = st.sidebar.radio(t("Navigate"), list(SECTIONS), key="menu",
                         format_func=lambda key: plain(nav_label(key)))
+# Backstop for the label problem above: map a stray label (in either language) to its section
+if menu not in SECTIONS:
+    nav_labels = {plain(translate(key, lang)): key for key in SECTIONS for lang in LANGUAGES}
+    menu = nav_labels.get(menu, next(iter(SECTIONS)))
 
 theme_keys = list(PALETTES)
 if "theme" not in st.session_state:
@@ -64,6 +83,9 @@ theme_choice = st.sidebar.selectbox(
     key="theme",
     format_func=label_func(lambda k: PALETTES[k][0]),
 )
+if theme_choice not in PALETTES:
+    theme_names = {translate(PALETTES[key][0], lang): key for key in PALETTES for lang in LANGUAGES}
+    theme_choice = theme_names.get(theme_choice, theme_keys[0])
 st.query_params["theme"] = theme_choice
 apply_theme(theme_choice)
 
