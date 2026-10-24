@@ -1,4 +1,4 @@
-<h1><img src="assets/civiclens-logo.png" alt="CivicLens" width="440"></h1>
+# CivicLens
 
 [![Tests](https://github.com/adi-kai/CivicLens/actions/workflows/tests.yml/badge.svg)](https://github.com/adi-kai/CivicLens/actions/workflows/tests.yml)
 

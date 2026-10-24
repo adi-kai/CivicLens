@@ -70,10 +70,6 @@ def apply_base_styles():
     .cl-brand-name { font-family: 'Source Serif 4', Georgia, serif; font-weight: 700; font-size: 1.9rem;
                      line-height: 1.1; letter-spacing: -0.02em; color: var(--cl-ink, #1A1A1A); }
     .cl-brand-tag  { font-size: 0.68rem; color: var(--cl-muted, #555); margin-top: 4px; }
-    .cl-brand-row  { display: flex; align-items: center; gap: 10px; }
-    .cl-brand-mark { width: 42px; height: 42px; flex: none; }
-    .cl-brand-mark .ink    { fill: var(--cl-logo-ink, #14284B); stroke: var(--cl-logo-ink, #14284B); }
-    .cl-brand-mark .accent { stroke: #D2402F; }
 
     /* ── Section label: monospace caps. The rows and link lists below it bring the rule. ── */
     .section-label { font-size: 0.75rem; font-weight: 500; color: var(--cl-ink, #1A1A1A); margin: 2.2rem 0 0.1rem 0; }
@@ -206,9 +202,6 @@ PALETTES = {
     "paper": ("Ballot Paper",       "#F3F0E8", "#FFFFFF", "#1A1A1A", "#B8321A", "#FFFFFF", "#B8321A"),
     "night": ("Ballot Paper Night", "#16140F", "#221F18", "#EDE8DC", "#E36B4F", "#16140F", "#E36B4F"),
 }
-# The logo's navy disappears on the night paper, so Night draws it in the theme's ink
-LOGO_INK = {"paper": "#14284B", "night": "#EDE8DC"}
-
 # Party swatch colors per theme: the light ones are too dark to read on the night paper
 PARTY_SWATCHES = {
     "paper": ("#1F3F7A", "#C0392B", "#6B6B6B"),
@@ -229,7 +222,6 @@ def apply_theme(key: str):
         --cl-border: color-mix(in srgb, {ink} 30%, {card});
         --cl-tint:   color-mix(in srgb, {ink} 6%, {paper});
         --cl-dem: {dem}; --cl-rep: {rep}; --cl-other: {other};
-        --cl-logo-ink: {LOGO_INK[key]};
     }}
     .stApp, [data-testid="stHeader"] {{ background: var(--cl-paper); }}
     .stApp, .stApp p, .stApp li, .stApp label, .stApp td, .stApp th,

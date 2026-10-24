@@ -6,9 +6,9 @@ import streamlit as st
 # CONFIG
 # ─────────────────────────────────────────────
 # Must be the first Streamlit call, before anything below renders.
-APP_DIR = os.path.dirname(os.path.abspath(__file__))
 st.set_page_config(page_title="CivicLens", layout="wide",
-                   page_icon=os.path.join(APP_DIR, "assets", "favicon.png"))
+                   page_icon=os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                          "assets", "favicon.png"))
 
 from civiclens.helpers import plain  # noqa: E402
 from civiclens.i18n import LANG_KEY, LANGUAGES, label_func, t, translate  # noqa: E402
@@ -28,20 +28,8 @@ if LANG_KEY not in st.session_state:
     url_lang = st.query_params.get(LANG_KEY, "en")
     st.session_state[LANG_KEY] = url_lang if url_lang in LANGUAGES else "en"
 
-# assets/civiclens-mark.svg drawn inline, so its navy can follow the theme (.ink / .accent)
-BRAND_MARK = (
-    '<svg class="cl-brand-mark" viewBox="0 0 120 120" aria-hidden="true">'
-    '<circle class="ink" cx="52" cy="52" r="39" fill="none" style="fill:none" stroke-width="9"/>'
-    '<line class="accent" x1="81" y1="81" x2="108" y2="108" stroke-width="12" stroke-linecap="round"/>'
-    '<g class="ink" stroke-width="0"><path d="M33 60 A19 19 0 0 1 71 60 Z"/>'
-    '<rect x="51" y="29" width="2" height="12"/><rect x="32" y="61" width="40" height="3"/>'
-    '<rect x="36" y="65" width="4" height="8"/><rect x="46" y="65" width="4" height="8"/>'
-    '<rect x="56" y="65" width="4" height="8"/><rect x="66" y="65" width="4" height="8"/>'
-    '<rect x="32" y="74" width="40" height="3"/></g></svg>'
-)
 st.sidebar.markdown(
-    f'<div class="cl-brand"><div class="cl-brand-row">{BRAND_MARK}'
-    '<div class="cl-brand-name">CivicLens</div></div>'
+    '<div class="cl-brand"><div class="cl-brand-name">CivicLens</div>'
     f'<div class="cl-brand-tag">{t("Nonpartisan voter guide")}</div></div>',
     unsafe_allow_html=True,
 )
@@ -108,7 +96,7 @@ SECTIONS[menu]()
 # Privacy Policy and Terms of Use
 def read_policy_file(path: str):
     # Resolve next to this script so the app works no matter which folder it's launched from
-    path = os.path.join(APP_DIR, path)
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), path)
     try:
         with open(path, "r", encoding="utf-8") as f:
             return f.read()
