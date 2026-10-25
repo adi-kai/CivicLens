@@ -236,21 +236,43 @@ class StaleDistrictCorrection(unittest.TestCase):
         self.assertEqual(reps, self.GEO)
 
     def test_census_failure_changes_nothing(self):
-        tiger._legislative_layer_ids.clear()
+        tiger._current_layer_ids_cached.clear()
         with mock.patch.object(tiger.requests, "get", side_effect=ConnectionError("down")):
             self.assertEqual(tiger.state_districts_at(35.39, -80.84), {})
 
     def test_finds_layers_by_name(self):
-        tiger._legislative_layer_ids.clear()
+        tiger._current_layer_ids_cached.clear()
         tiger._districts_at_cached.clear()
-        layers = response(200, {"layers": [{"id": 1, "name": "2026 State Legislative Districts - Upper"},
+        layers = response(200, {"layers": [{"id": 0, "name": "120th Congressional Districts"},
+                                           {"id": 1, "name": "2026 State Legislative Districts - Upper"},
+                                           {"id": 4, "name": "119th Congressional Districts"},
                                            {"id": 5, "name": "2024 State Legislative Districts - Upper"},
-                                           {"id": 6, "name": "2024 State Legislative Districts - Lower"}]})
+                                           {"id": 6, "name": "2024 State Legislative Districts - Lower"},
+                                           {"id": 9, "name": "2024 State Legislative Districts - Upper"}]})
         upper = response(200, {"features": [{"attributes": {"BASENAME": "38"}}]})
         lower = response(200, {"features": [{"attributes": {"BASENAME": "106"}}]})
         with mock.patch.object(tiger.requests, "get", side_effect=[layers, upper, lower]) as get:
             self.assertEqual(tiger.state_districts_at(35.39, -80.84), {"upper": "38", "lower": "106"})
         self.assertEqual([c.args[0].split("/")[-2] for c in get.call_args_list[1:]], ["5", "6"])
+
+
+class CurrentLayers(unittest.TestCase):
+    def setUp(self):
+        tiger._current_layer_ids_cached.clear()
+
+    def test_first_layer_with_each_name(self):
+        layers = response(200, {"layers": [{"id": 0, "name": "120th Congressional Districts"},
+                                           {"id": 11, "name": "119th Congressional Districts"},
+                                           {"id": 12, "name": "2024 State Legislative Districts - Upper"},
+                                           {"id": 13, "name": "2024 State Legislative Districts - Lower"},
+                                           {"id": 20, "name": "119th Congressional Districts"}]})
+        with mock.patch.object(tiger.requests, "get", return_value=layers):
+            self.assertEqual(tiger.current_layer_ids(), {"us_house": 11, "upper": 12, "lower": 13})
+
+    def test_falls_back_when_a_name_is_missing(self):
+        layers = response(200, {"layers": [{"id": 0, "name": "120th Congressional Districts"}]})
+        with mock.patch.object(tiger.requests, "get", return_value=layers):
+            self.assertEqual(tiger.current_layer_ids(), {"us_house": 4, "upper": 5, "lower": 6})
 
 
 class ActiveElection(unittest.TestCase):

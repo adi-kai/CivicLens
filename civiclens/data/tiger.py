@@ -4,14 +4,19 @@ import streamlit as st
 
 from civiclens.helpers import district_key
 
-# TIGERweb — current (2025-2026) layer IDs for the Legislative MapServer
-# These layer IDs are national — the same MapServer covers every state, you just
-# filter by FIPS code in the WHERE clause.
+# TIGERweb's Legislative MapServer covers every state; you filter by FIPS code in the WHERE
+# clause. Census adds new maps ahead of each election (the 120th Congress and 2026 legislative
+# maps took over layers 0-2 in 2026), so the maps current members were elected on are found by
+# name; these IDs are only the fallback if the layer list can't be read.
 # Verify at: tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer
 TIGER_BASE           = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer"
-LAYER_US_HOUSE       = 0   # 119th Congressional Districts        (STATE field, district: CD119)
-LAYER_STATE_SENATE   = 1   # 2024 State Legislative Upper/Senate  (STATE field, district: SLDU)
-LAYER_STATE_HOUSE    = 2   # 2024 State Legislative Lower/House   (STATE field, district: SLDL)
+LAYER_US_HOUSE       = 4   # 119th Congressional Districts        (STATE field, district: CD119)
+LAYER_STATE_SENATE   = 5   # 2024 State Legislative Upper/Senate  (STATE field, district: SLDU)
+LAYER_STATE_HOUSE    = 6   # 2024 State Legislative Lower/House   (STATE field, district: SLDL)
+
+CURRENT_LAYERS = {"us_house": ("119th Congressional Districts", LAYER_US_HOUSE),
+                  "upper": ("2024 State Legislative Districts - Upper", LAYER_STATE_SENATE),
+                  "lower": ("2024 State Legislative Districts - Lower", LAYER_STATE_HOUSE)}
 
 # Stable GeoJSON with outlines for all 50 states + DC (avoids shifting TIGERweb State_County layer IDs)
 US_STATES_GEOJSON_URL = (
@@ -62,23 +67,27 @@ def fetch_tiger_geojson(layer_id: int, state_fips: str, state_abbr: str = "") ->
     except TigerFetchError as e:
         return {}, str(e)
 
-# Current legislators were elected on the 2024 maps; TIGERweb's layer numbers shift as new
-# maps are added, so the layer is found by name
-CURRENT_LEGISLATIVE_LAYERS = {"upper": "2024 State Legislative Districts - Upper",
-                              "lower": "2024 State Legislative Districts - Lower"}
-
 @st.cache_data(ttl=86400, show_spinner=False)
-def _legislative_layer_ids() -> dict:
+def _current_layer_ids_cached() -> dict:
     layers = requests.get(TIGER_BASE, params={"f": "json"}, timeout=30).json().get("layers", [])
-    ids = {}
-    for chamber, name in CURRENT_LEGISLATIVE_LAYERS.items():
-        ids[chamber] = next(l["id"] for l in layers if l.get("name") == name)
-    return ids
+    # The first layer with each name; the MapServer repeats some names further down
+    return {key: next(l["id"] for l in layers if l.get("name") == name)
+            for key, (name, _) in CURRENT_LAYERS.items()}
+
+def current_layer_ids() -> dict:
+    """{"us_house": 4, "upper": 5, "lower": 6} — the layers for the maps current members were
+    elected on; the fallback IDs if the layer list can't be read (not cached, so it's retried)."""
+    try:
+        return _current_layer_ids_cached()
+    except Exception:
+        return {key: layer_id for key, (_, layer_id) in CURRENT_LAYERS.items()}
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def _districts_at_cached(lat: float, lng: float) -> dict:
     found = {}
-    for chamber, layer_id in _legislative_layer_ids().items():
+    layer_ids = current_layer_ids()
+    for chamber in ("upper", "lower"):
+        layer_id = layer_ids[chamber]
         r = requests.get(f"{TIGER_BASE}/{layer_id}/query", params={
             "geometry": f"{lng},{lat}", "geometryType": "esriGeometryPoint", "inSR": 4326,
             "spatialRel": "esriSpatialRelIntersects", "outFields": "BASENAME",

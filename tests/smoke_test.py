@@ -147,7 +147,9 @@ def fake_get(url, params=None, **kwargs):
     if "wikidata" in url:
         return FakeResponse(WIKIDATA)
     if url.endswith("Legislative/MapServer"):
-        return FakeResponse({"layers": [{"id": 5, "name": "2024 State Legislative Districts - Upper"},
+        return FakeResponse({"layers": [{"id": 0, "name": "120th Congressional Districts"},
+                                        {"id": 4, "name": "119th Congressional Districts"},
+                                        {"id": 5, "name": "2024 State Legislative Districts - Upper"},
                                         {"id": 6, "name": "2024 State Legislative Districts - Lower"}]})
     if "tigerweb" in url and "geometry" in params:
         # The address is where people.geo says it is
@@ -155,8 +157,8 @@ def fake_get(url, params=None, **kwargs):
         return FakeResponse({"features": [{"attributes": {"BASENAME": district}}]})
     if "tigerweb" in url:
         layer = url.rstrip("/").split("/")[-2]
-        return FakeResponse({"0": tiger("CD119", "12"), "1": tiger("SLDU", "037"),
-                             "2": tiger("SLDL", "099")}[layer])
+        return FakeResponse({"4": tiger("CD119", "12"), "5": tiger("SLDU", "037"),
+                             "6": tiger("SLDL", "099")}[layer])
     if "us-states.json" in url:
         return FakeResponse(US_STATES)
     raise AssertionError(f"unexpected GET {url}")

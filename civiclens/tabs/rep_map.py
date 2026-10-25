@@ -10,8 +10,7 @@ from civiclens.data.congress import get_federal_house_members, get_federal_senat
 from civiclens.data.geocode import geocode
 from civiclens.data.governors import get_governor, governor_links_html
 from civiclens.data.openstates import get_state_reps_by_chamber
-from civiclens.data.tiger import (LAYER_STATE_HOUSE, LAYER_STATE_SENATE, LAYER_US_HOUSE,
-                                  US_STATES_GEOJSON_URL, extract_district_key,
+from civiclens.data.tiger import (US_STATES_GEOJSON_URL, current_layer_ids, extract_district_key,
                                   fetch_tiger_geojson, geojson_bounds, is_undefined_area)
 from civiclens.helpers import (address_input, build_rep_lookup, esc, get_chamber_label,
                                html_block, party_color, party_fill, party_label, plain,
@@ -129,16 +128,17 @@ def render():
                 st.write(plain(t("📍 Address resolved to **{state}** — using that state.", state=state_disp)))
 
             st.write(plain(t("🗺️ Fetching Census district boundaries for {state}…", state=state_disp)))
-            geojson_us_house,     us_house_geo_err     = fetch_tiger_geojson(LAYER_US_HOUSE, state_fips, state_abbr)     if show_us_house    else ({}, "")
-            geojson_state_senate, state_senate_geo_err = fetch_tiger_geojson(LAYER_STATE_SENATE, state_fips, state_abbr) if show_state_sen   else ({}, "")
-            geojson_state_house,  state_house_geo_err  = fetch_tiger_geojson(LAYER_STATE_HOUSE, state_fips, state_abbr)  if show_state_house else ({}, "")
+            layers = current_layer_ids()
+            geojson_us_house,     us_house_geo_err     = fetch_tiger_geojson(layers["us_house"], state_fips, state_abbr)     if show_us_house    else ({}, "")
+            geojson_state_senate, state_senate_geo_err = fetch_tiger_geojson(layers["upper"], state_fips, state_abbr) if show_state_sen   else ({}, "")
+            geojson_state_house,  state_house_geo_err  = fetch_tiger_geojson(layers["lower"], state_fips, state_abbr)  if show_state_house else ({}, "")
             senate_layer = f"{t('State Senate')} — {state_disp}"
             house_layer  = f"{t('State House')} — {state_disp}"
             boundary_errors = [
                 (label, layer_id, err) for label, layer_id, err in [
-                    (t("U.S. House"), LAYER_US_HOUSE,     us_house_geo_err),
-                    (senate_layer,    LAYER_STATE_SENATE, state_senate_geo_err),
-                    (house_layer,     LAYER_STATE_HOUSE,  state_house_geo_err),
+                    (t("U.S. House"), layers["us_house"], us_house_geo_err),
+                    (senate_layer,    layers["upper"],    state_senate_geo_err),
+                    (house_layer,     layers["lower"],    state_house_geo_err),
                 ] if err
             ]
 
