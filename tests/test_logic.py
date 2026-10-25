@@ -4,6 +4,7 @@ safety. No network or API keys needed.
 Run from the project root:
     python -m unittest discover -s tests -v
 """
+import datetime
 import os
 import unittest
 
@@ -407,6 +408,25 @@ class DeadlineStatus(unittest.TestCase):
 
     def test_more_than_a_week_has_no_badge(self):
         self.assertEqual(self.badge("2026-10-21"), "")
+
+
+class PollingHours(unittest.TestCase):
+    TODAY = datetime.date(2026, 10, 25)
+
+    def test_drops_past_days(self):
+        from civiclens.tabs.polling import upcoming_hours
+        hours = "Sat, Oct 24: 9 am - 5 pm\nSun, Oct 25: 12 pm - 5 pm\nMon, Oct 26: 8:30 am - 5:00 pm"
+        self.assertEqual(upcoming_hours(hours, "2026", self.TODAY),
+                         "Sun, Oct 25: 12 pm - 5 pm\nMon, Oct 26: 8:30 am - 5:00 pm")
+
+    def test_all_past_is_empty(self):
+        from civiclens.tabs.polling import upcoming_hours
+        self.assertEqual(upcoming_hours("Fri, Sep 18: 8:30 am - 5:00 pm", "2026", self.TODAY), "")
+
+    def test_keeps_undated_lines(self):
+        from civiclens.tabs.polling import upcoming_hours
+        self.assertEqual(upcoming_hours("6:30am-7:30pm", "2026", self.TODAY), "6:30am-7:30pm")
+        self.assertEqual(upcoming_hours("Tue, Nov 3: 6 am - 7 pm", "", self.TODAY), "Tue, Nov 3: 6 am - 7 pm")
 
 
 class ElectionCountdown(unittest.TestCase):

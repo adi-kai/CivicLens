@@ -124,6 +124,12 @@ def fake_get(url, params=None, **kwargs):
             "pollingLocations": [{"address": {"locationName": "Fire Station 1", "line1": "1 Main St",
                                               "city": "Charlotte", "state": "NC", "zip": "28202"},
                                   "pollingHours": "6:30am-7:30pm"}],
+            "earlyVoteSites": [{"address": {"locationName": "Early Library", "line1": "2 Main St",
+                                            "city": "Charlotte", "state": "NC", "zip": "28202"},
+                                "pollingHours": "Sat, Oct 31: 9 am - 5 pm"},
+                               {"address": {"locationName": "Closed Annex", "line1": "3 Main St",
+                                            "city": "Charlotte", "state": "NC", "zip": "28202"},
+                                "pollingHours": "Mon, Oct 5: 9 am - 5 pm"}],
             "state": [{"electionAdministrationBody": {"electionRegistrationUrl": "https://example.gov/reg"}}],
         })
     if "people.geo" in url:
@@ -239,7 +245,8 @@ def polling(at):
     go(at, "📍 Polling Finder")
     at.text_input[0].input(ADDR)
     button(at, "Search").click().run()
-    return ["Fire Station 1", "North Carolina Voting Resources"]
+    return (["Fire Station 1", "Early Library", "North Carolina Voting Resources"],
+            ["Closed Annex"])
 
 def deadlines(at):
     go(at, "📅 Deadlines")

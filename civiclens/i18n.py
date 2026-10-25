@@ -194,6 +194,12 @@ ES = {
     "✅ Polling location found!": "✅ ¡Encontramos tu lugar de votación!",
     "Polling Location": "Lugar de votación",
     "🕐 Hours: {hours}": "🕐 Horario: {hours}",
+    "🗳️ Election Day": "🗳️ Día de las Elecciones",
+    "🗳️ Early Voting Sites": "🗳️ Lugares de votación anticipada",
+    "{n} more early voting sites — see the official links below.":
+        "{n} lugares más de votación anticipada; consulta los enlaces oficiales abajo.",
+    "Your election office hasn't published polling places for this address yet. Use these resources:":
+        "Tu oficina electoral aún no ha publicado los lugares de votación para esta dirección. Usa estos recursos:",
     "Polling location not available right now — no active election. Use these resources:":
         "El lugar de votación no está disponible en este momento porque no hay una elección activa. Usa estos recursos:",
     "Voting Location Finder": "Buscador de lugares de votación",
