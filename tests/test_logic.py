@@ -410,6 +410,17 @@ class DeadlineStatus(unittest.TestCase):
         self.assertEqual(self.badge("2026-10-21"), "")
 
 
+class DeadlineOrder(unittest.TestCase):
+    def test_every_state_in_date_order(self):
+        from civiclens.deadline_data import STATE_DEADLINES
+        from civiclens.tabs.deadlines import in_date_order
+        nc = [item["name"] for item in in_date_order(STATE_DEADLINES["NC"]["items"])]
+        self.assertLess(nc.index("Absentee Ballot Request Deadline"), nc.index("Early Voting Ends"))
+        for state, data in STATE_DEADLINES.items():
+            firsts = [item.get("date") or item["start"] for item in in_date_order(data["items"])]
+            self.assertEqual(firsts, sorted(firsts), state)
+
+
 class PollingHours(unittest.TestCase):
     TODAY = datetime.date(2026, 10, 25)
 

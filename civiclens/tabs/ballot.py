@@ -87,6 +87,12 @@ def render():
     if error and any(word in error for word in ADDRESS_ERRORS):
         st.warning(t("We couldn't match that address to a ballot. Try adding your city and zip code."))
         return
+    if not ballot["races"] and not ballot["measures"] and not error and data.get("election"):
+        # The election is loaded but this address isn't in any precinct, e.g. a library or town hall
+        st.info(t("No ballot was found for this exact address. Ballots are matched to a voter's precinct, so public buildings like libraries and town halls often have none — try your home address."))
+        section_label(t("🗳️ Official Resources"))
+        official_links(get_official_resources(state))
+        return
     if not ballot["races"] and not ballot["measures"]:
         where = state_name or t("your state")
         st.info(t("{state} hasn't published its ballot data yet. Election offices add official ballots state by state as Election Day gets closer — check back soon, or use the official resources below.",

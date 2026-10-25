@@ -391,6 +391,8 @@ ES = {
     "We couldn't match that address to a ballot. Try adding your city and zip code.":
         "No pudimos encontrar una boleta para esa dirección. Intenta agregar tu ciudad y código postal.",
     "your state": "tu estado",
+    "No ballot was found for this exact address. Ballots are matched to a voter's precinct, so public buildings like libraries and town halls often have none — try your home address.":
+        "No encontramos una boleta para esta dirección exacta. Las boletas corresponden al precinto de cada votante, así que los edificios públicos como bibliotecas y ayuntamientos a menudo no tienen una; prueba con la dirección de tu casa.",
     "{state} hasn't published its ballot data yet. Election offices add official ballots state by state as Election Day gets closer — check back soon, or use the official resources below.":
         "{state} todavía no ha publicado los datos de su boleta. Las oficinas electorales agregan las boletas oficiales estado por estado a medida que se acerca el Día de las Elecciones; vuelve pronto o usa los recursos oficiales de abajo.",
     "1 race": "1 contienda",

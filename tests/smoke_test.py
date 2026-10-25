@@ -109,6 +109,10 @@ def fake_get(url, params=None, **kwargs):
         if ", SC" in params.get("address", ""):
             # A state whose ballot data isn't published yet
             return FakeResponse({"error": {"message": "Election unknown"}}, status=400)
+        if "Town Hall" in params.get("address", ""):
+            # An address that's in no precinct: the election, but no contests
+            return FakeResponse({"election": {"id": "9000", "name": "2026 General Midterm Election",
+                                              "electionDay": "2026-11-03"}})
         return FakeResponse({
             "election": {"id": "9000", "name": "2026 General Midterm Election", "electionDay": "2026-11-03"},
             "contests": [
@@ -250,6 +254,11 @@ def ballot_not_published(at):
     at.text_input(key="address").input("1101 Main St, Columbia, SC 29201").run()
     return ["South Carolina hasn't published its ballot data yet", "SC Election Commission"]
 
+def ballot_no_precinct(at):
+    go(at, "📝 My Ballot")
+    at.text_input(key="address").input("1 Town Hall Sq, Huntersville, NC 28078").run()
+    return (["No ballot was found for this exact address", "NCSBE"], ["hasn't published its ballot data"])
+
 def polling(at):
     go(at, "📍 Polling Finder")
     at.text_input[0].input(ADDR)
@@ -385,7 +394,7 @@ def switch_language(at):
     return [f"TextInput: {ADDR}", "Senado estatal — Distrito 37"]
 
 
-SECTIONS = [home, home_card, polling, ballot, ballot_not_published, deadlines, deadlines_sc,
+SECTIONS = [home, home_card, polling, ballot, ballot_not_published, ballot_no_precinct, deadlines, deadlines_sc,
             my_reps, shared_address, rep_map, bills, compare, candidates, theme, switch_language]
 SPANISH_SECTIONS = [es_home, es_ballot, es_deadlines, es_my_reps, es_rep_map, es_bills, es_candidates]
 

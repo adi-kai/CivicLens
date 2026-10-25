@@ -57,6 +57,11 @@ def deadline_card(name: str, when: str, note: str, first_day: str, last_day: str
     </div>"""), unsafe_allow_html=True)
 
 
+def in_date_order(items: list) -> list:
+    """Deadlines by their first day; same-day items keep their listed order."""
+    return sorted(items, key=lambda item: item.get("date") or item["start"])
+
+
 def show_official_resources(state_abbr: str, state_name: str):
     section_label(t("🗳️ Official Resources"))
     official_links(get_official_resources(state_abbr))
@@ -98,7 +103,7 @@ def render():
 
     section_label(esc(t("{state} 2026 Deadlines", state=dl_state_name)))
     source = t("Source: {source}", source=t(data["source"]))
-    for item in data["items"]:
+    for item in in_date_order(data["items"]):
         if "date" in item:
             when = format_date(item["date"], item.get("time", ""))
             first_day = last_day = item["date"]
