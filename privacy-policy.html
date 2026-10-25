@@ -121,7 +121,7 @@
 <header>
   <div class="wordmark">Civic<span>Lens</span></div>
   <h1>Privacy Policy</h1>
-  <p>Effective date: October 3, 2026 &nbsp;·&nbsp; North Carolina, United States</p>
+  <p>Effective date: October 25, 2026 &nbsp;·&nbsp; North Carolina, United States</p>
 </header>
 
 <main>
@@ -129,8 +129,8 @@
   <div class="plain-banner">
     <strong>Plain-English summary</strong>
     CivicLens does not store, sell, or share your address or any personal information.
-    Your address is used only to look up your representatives in real time and is discarded
-    when your session ends. No account is required. No cookies track you.
+    Your address is used only to look up your representatives in real time and is never saved
+    to a database, file, or log. No account is required. No cookies track you.
   </div>
 
   <section>
@@ -149,13 +149,14 @@
       <li>Your address is sent to <a href="https://nominatim.openstreetmap.org" target="_blank">OpenStreetMap Nominatim</a>
           to convert it into geographic coordinates (latitude and longitude).</li>
       <li>Those coordinates are sent to the <strong>OpenStates API</strong> to retrieve your
-          representatives. Only your state (not your address or coordinates) is used to load
-          district boundaries and other statewide information.</li>
+          representatives, and to the <strong>U.S. Census Bureau's TIGERweb</strong> service to
+          confirm your current state legislative districts. Only your state (not your address or
+          coordinates) is used to load district boundary maps and other statewide information.</li>
       <li>In the Polling Finder and My Ballot sections, your address is also sent to the <strong>Google Civic
           Information API</strong> to look up your polling place and the races on your ballot.</li>
       <li><span class="tag">✓ Not stored</span> Your address is never written to a database, file, or log by CivicLens.</li>
-      <li><span class="tag">✓ Not sold</span> We do not sell, rent, or share your address with any third party.</li>
-      <li><span class="tag">✓ Session only</span> A short-lived memory cache (max 24 hours) avoids
+      <li><span class="tag">✓ Not sold</span> We do not sell or rent your address, and it is shared only with the lookup services listed in section 4, only to answer your search.</li>
+      <li><span class="tag">✓ Memory only</span> A short-lived memory cache (max 24 hours) avoids
           repeat API lookups for the same address. This cache exists only in the running server's
           memory and is cleared on every restart.</li>
     </ul>
@@ -181,16 +182,17 @@
           and a state and search keywords to return bills.</li>
       <li><strong>Google Civic Information API</strong> — receives your address to return voter
           information where available.</li>
-      <li><strong>U.S. Census TIGERweb</strong> — provides district boundary maps; only the
-          selected state is sent.</li>
+      <li><strong>U.S. Census TIGERweb</strong> — provides district boundary maps, for which only
+          the selected state is sent, and receives your coordinates to confirm which state
+          legislative districts they fall in.</li>
       <li><strong>Wikidata</strong> and the public <strong>unitedstates/congress-legislators</strong>
           dataset — provide governor and member-of-Congress information; no user data is sent.</li>
       <li><strong>Google Gemini API</strong> — used in the Candidates tab to research publicly
           available campaign information, and in the Bill Tracker to summarize bills. It receives
           only the race, state, or bill being looked up. No user address or personal data is sent.</li>
-      <li><strong>Groq</strong> and <strong>Tavily</strong> — a backup for candidate research when
-          Gemini is unavailable. They receive only the race and state being looked up. No user
-          address or personal data is sent.</li>
+      <li><strong>Groq</strong> and <strong>Tavily</strong> — a backup when Gemini is unavailable.
+          Groq receives only the race, state, or bill being looked up; Tavily (candidate research
+          only) receives the race and state. No user address or personal data is sent.</li>
     </ul>
     <p>To display the app, your browser also loads fonts from <strong>Google Fonts</strong>, map
     tiles from <strong>OpenStreetMap</strong>, map scripts from public content delivery networks, and
