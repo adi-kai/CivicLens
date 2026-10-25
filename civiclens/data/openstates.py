@@ -3,6 +3,7 @@ import requests
 import streamlit as st
 
 from civiclens.config import OPENSTATES_KEY
+from civiclens.data.congress import CONGRESS_PHOTO_URL
 from civiclens.data.tiger import state_districts_at
 from civiclens.helpers import district_key
 from civiclens.states import DEFAULT_STATE
@@ -12,15 +13,25 @@ def get_reps_by_location(lat: float, lng: float) -> list:
     try:
         r = requests.get(
             "https://v3.openstates.org/people.geo",
-            params={"lat": lat, "lng": lng, "per_page": 50},
+            params={"lat": lat, "lng": lng, "per_page": 50, "include": "other_identifiers"},
             headers={"X-API-KEY": OPENSTATES_KEY},
             timeout=15
         )
         if r.status_code == 200:
-            return correct_state_districts(r.json().get("results", []), state_districts_at(lat, lng))
+            reps = correct_state_districts(r.json().get("results", []), state_districts_at(lat, lng))
+            return [with_congress_photo(p) for p in reps]
     except Exception:
         pass
     return []
+
+def with_congress_photo(person: dict) -> dict:
+    """OpenStates has no photo for some members of Congress (new ones especially); their
+    Bioguide ID finds the same public-domain photo the Rep Map uses."""
+    if person.get("image"):
+        return person
+    bioguide = next((i.get("identifier") for i in person.get("other_identifiers") or []
+                     if i.get("scheme") == "bioguide"), "")
+    return dict(person, image=CONGRESS_PHOTO_URL.format(bioguide=bioguide)) if bioguide else person
 
 def correct_state_districts(reps: list, census_districts: dict) -> list:
     """people.geo can match an address against an old map (in 2026 it still used North

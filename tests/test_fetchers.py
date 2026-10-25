@@ -209,6 +209,21 @@ def state_rep(name, chamber, district):
             "current_role": {"org_classification": chamber, "district": district}}
 
 
+class CongressPhotos(unittest.TestCase):
+    def test_fills_missing_photo_from_bioguide(self):
+        moore = {"name": "Tim Moore", "image": "",
+                 "other_identifiers": [{"scheme": "bioguide", "identifier": "M001236"}]}
+        self.assertEqual(openstates.with_congress_photo(moore)["image"],
+                         "https://unitedstates.github.io/images/congress/225x275/M001236.jpg")
+
+    def test_keeps_existing_photo_and_skips_state_legislators(self):
+        budd = {"image": "https://example.com/budd.jpg",
+                "other_identifiers": [{"scheme": "bioguide", "identifier": "B001305"}]}
+        self.assertEqual(openstates.with_congress_photo(budd), budd)
+        legislator = {"image": "", "other_identifiers": [{"scheme": "legacy_openstates", "identifier": "X"}]}
+        self.assertEqual(openstates.with_congress_photo(legislator), legislator)
+
+
 class StaleDistrictCorrection(unittest.TestCase):
     """people.geo used North Carolina's 2018 Senate map in 2026 (District 41 for an address
     that's in 38); Census's current map decides."""
