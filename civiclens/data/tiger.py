@@ -62,6 +62,40 @@ def fetch_tiger_geojson(layer_id: int, state_fips: str, state_abbr: str = "") ->
     except TigerFetchError as e:
         return {}, str(e)
 
+# Current legislators were elected on the 2024 maps; TIGERweb's layer numbers shift as new
+# maps are added, so the layer is found by name
+CURRENT_LEGISLATIVE_LAYERS = {"upper": "2024 State Legislative Districts - Upper",
+                              "lower": "2024 State Legislative Districts - Lower"}
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def _legislative_layer_ids() -> dict:
+    layers = requests.get(TIGER_BASE, params={"f": "json"}, timeout=30).json().get("layers", [])
+    ids = {}
+    for chamber, name in CURRENT_LEGISLATIVE_LAYERS.items():
+        ids[chamber] = next(l["id"] for l in layers if l.get("name") == name)
+    return ids
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def _districts_at_cached(lat: float, lng: float) -> dict:
+    found = {}
+    for chamber, layer_id in _legislative_layer_ids().items():
+        r = requests.get(f"{TIGER_BASE}/{layer_id}/query", params={
+            "geometry": f"{lng},{lat}", "geometryType": "esriGeometryPoint", "inSR": 4326,
+            "spatialRel": "esriSpatialRelIntersects", "outFields": "BASENAME",
+            "returnGeometry": "false", "f": "json"}, timeout=30)
+        features = r.json().get("features", [])
+        if features:
+            found[chamber] = features[0]["attributes"].get("BASENAME", "")
+    return found
+
+def state_districts_at(lat: float, lng: float) -> dict:
+    """{"upper": "38", "lower": "106"} — the state legislative districts (as Census names them)
+    a point falls in on the maps current legislators were elected on; {} if TIGERweb fails."""
+    try:
+        return _districts_at_cached(lat, lng)
+    except Exception:
+        return {}
+
 def extract_district_key(props: dict, district_field: str = "") -> str:
     """
     The feature's district as a district_key(), to match build_rep_lookup().

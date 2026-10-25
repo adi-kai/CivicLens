@@ -146,6 +146,13 @@ def fake_get(url, params=None, **kwargs):
         return FakeResponse(CONGRESS)
     if "wikidata" in url:
         return FakeResponse(WIKIDATA)
+    if url.endswith("Legislative/MapServer"):
+        return FakeResponse({"layers": [{"id": 5, "name": "2024 State Legislative Districts - Upper"},
+                                        {"id": 6, "name": "2024 State Legislative Districts - Lower"}]})
+    if "tigerweb" in url and "geometry" in params:
+        # The address is where people.geo says it is
+        district = {"5": "37", "6": "99"}[url.rstrip("/").split("/")[-2]]
+        return FakeResponse({"features": [{"attributes": {"BASENAME": district}}]})
     if "tigerweb" in url:
         layer = url.rstrip("/").split("/")[-2]
         return FakeResponse({"0": tiger("CD119", "12"), "1": tiger("SLDU", "037"),

@@ -3,6 +3,8 @@ import requests
 import streamlit as st
 
 from civiclens.config import OPENSTATES_KEY
+from civiclens.data.tiger import state_districts_at
+from civiclens.helpers import district_key
 from civiclens.states import DEFAULT_STATE
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -13,6 +15,39 @@ def get_reps_by_location(lat: float, lng: float) -> list:
             params={"lat": lat, "lng": lng, "per_page": 50},
             headers={"X-API-KEY": OPENSTATES_KEY},
             timeout=15
+        )
+        if r.status_code == 200:
+            return correct_state_districts(r.json().get("results", []), state_districts_at(lat, lng))
+    except Exception:
+        pass
+    return []
+
+def correct_state_districts(reps: list, census_districts: dict) -> list:
+    """people.geo can match an address against an old map (in 2026 it still used North
+    Carolina's 2018 Senate districts). Where Census's current map puts the address in a
+    different district, that chamber's members are replaced with the district's members
+    from the OpenStates roster; if that lookup finds no one, people.geo's answer stays."""
+    for chamber, census_district in census_districts.items():
+        in_chamber = [p for p in reps
+                      if (p.get("jurisdiction") or {}).get("classification") == "state"
+                      and (p.get("current_role") or {}).get("org_classification") == chamber]
+        if not in_chamber or not census_district:
+            continue
+        if any(district_key(p["current_role"].get("district")) == district_key(census_district)
+               for p in in_chamber):
+            continue
+        members = _district_members(in_chamber[0]["jurisdiction"]["id"], chamber, census_district)
+        if members:
+            reps = [p for p in reps if p not in in_chamber] + members
+    return reps
+
+def _district_members(jurisdiction: str, chamber: str, district: str) -> list:
+    try:
+        r = requests.get(
+            "https://v3.openstates.org/people",
+            params={"jurisdiction": jurisdiction, "org_classification": chamber, "district": district},
+            headers={"X-API-KEY": OPENSTATES_KEY},
+            timeout=15,
         )
         if r.status_code == 200:
             return r.json().get("results", [])

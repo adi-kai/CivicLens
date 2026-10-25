@@ -203,6 +203,56 @@ class OpenStatesRoster(unittest.TestCase):
         self.assertEqual(err, "HTTP 429: Too Many Requests")
 
 
+def state_rep(name, chamber, district):
+    return {"name": name, "jurisdiction": {"id": "ocd-jurisdiction/country:us/state:nc/government",
+                                           "classification": "state"},
+            "current_role": {"org_classification": chamber, "district": district}}
+
+
+class StaleDistrictCorrection(unittest.TestCase):
+    """people.geo used North Carolina's 2018 Senate map in 2026 (District 41 for an address
+    that's in 38); Census's current map decides."""
+    GEO = [state_rep("Old Map Senator", "upper", "41"), state_rep("House Member", "lower", "106"),
+           {"name": "U.S. Senator", "jurisdiction": {"classification": "country"},
+            "current_role": {"org_classification": "upper", "district": "North Carolina"}}]
+
+    def test_replaces_member_from_old_map(self):
+        roster = response(200, {"results": [state_rep("Current Senator", "upper", "38")]})
+        with mock.patch.object(openstates.requests, "get", return_value=roster) as get:
+            reps = openstates.correct_state_districts(self.GEO, {"upper": "38", "lower": "106"})
+        self.assertEqual(sorted(p["name"] for p in reps), ["Current Senator", "House Member", "U.S. Senator"])
+        self.assertEqual(get.call_count, 1)
+        self.assertEqual(get.call_args.kwargs["params"]["district"], "38")
+
+    def test_no_lookup_when_maps_agree(self):
+        with mock.patch.object(openstates.requests, "get") as get:
+            reps = openstates.correct_state_districts(self.GEO, {"upper": "041", "lower": "106"})
+        self.assertEqual(reps, self.GEO)
+        get.assert_not_called()
+
+    def test_keeps_answer_when_roster_has_no_one(self):
+        with mock.patch.object(openstates.requests, "get", return_value=response(200, {"results": []})):
+            reps = openstates.correct_state_districts(self.GEO, {"upper": "38"})
+        self.assertEqual(reps, self.GEO)
+
+    def test_census_failure_changes_nothing(self):
+        tiger._legislative_layer_ids.clear()
+        with mock.patch.object(tiger.requests, "get", side_effect=ConnectionError("down")):
+            self.assertEqual(tiger.state_districts_at(35.39, -80.84), {})
+
+    def test_finds_layers_by_name(self):
+        tiger._legislative_layer_ids.clear()
+        tiger._districts_at_cached.clear()
+        layers = response(200, {"layers": [{"id": 1, "name": "2026 State Legislative Districts - Upper"},
+                                           {"id": 5, "name": "2024 State Legislative Districts - Upper"},
+                                           {"id": 6, "name": "2024 State Legislative Districts - Lower"}]})
+        upper = response(200, {"features": [{"attributes": {"BASENAME": "38"}}]})
+        lower = response(200, {"features": [{"attributes": {"BASENAME": "106"}}]})
+        with mock.patch.object(tiger.requests, "get", side_effect=[layers, upper, lower]) as get:
+            self.assertEqual(tiger.state_districts_at(35.39, -80.84), {"upper": "38", "lower": "106"})
+        self.assertEqual([c.args[0].split("/")[-2] for c in get.call_args_list[1:]], ["5", "6"])
+
+
 class ActiveElection(unittest.TestCase):
     def setUp(self):
         civic.get_active_election_id.clear()
