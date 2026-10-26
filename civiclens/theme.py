@@ -58,8 +58,24 @@ def apply_base_styles():
     .cl-feature-desc  { font-size: 0.93rem; color: var(--cl-muted, #555); line-height: 1.45;
                         margin: 0 0 0.6rem; min-height: 4.2em; }
     @media (max-width: 640px) { .cl-feature-desc { min-height: 0; } }
-    .cl-trust { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    /* Section cards fill their column and share one height; the Open button sits at the bottom */
+    [data-testid="stColumn"]:has(.cl-feature-num) > [data-testid="stVerticalBlock"] { height: 100%; }
+    [data-testid="stColumn"]:has(.cl-feature-num) > [data-testid="stVerticalBlock"] > [data-testid="stLayoutWrapper"] { flex: 1; }
+    [data-testid="stVerticalBlock"]:has(> [data-testid="stElementContainer"] .cl-feature-num) {
+        height: 100%; min-height: 16.5rem; }
+    [data-testid="stVerticalBlock"]:has(> [data-testid="stElementContainer"] .cl-feature-num)
+        > [data-testid="stElementContainer"]:last-child { margin-top: auto; }
+    /* Four across gets too narrow beside the sidebar ("Representatives" breaks mid-word): two per row */
+    @media (min-width: 641px) and (max-width: 1300px) {
+        [data-testid="stHorizontalBlock"]:has(.cl-feature-num) { flex-wrap: wrap; }
+        [data-testid="stHorizontalBlock"]:has(.cl-feature-num) > [data-testid="stColumn"] {
+            flex: 1 1 calc(50% - 1rem) !important; min-width: calc(50% - 1rem) !important; } }
+    @media (max-width: 640px) {
+        [data-testid="stVerticalBlock"]:has(> [data-testid="stElementContainer"] .cl-feature-num) { min-height: 11.75rem; } }
+    .cl-trust { display: grid; grid-template-columns: repeat(4, 1fr);
                 gap: 1.5rem; margin: 0.4rem 0 1rem; }
+    @media (max-width: 1100px) { .cl-trust { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 640px) { .cl-trust { grid-template-columns: 1fr; } }
     .cl-trust-item { border-top: 3px solid var(--cl-ink, #1A1A1A); padding-top: 0.75rem; }
     .cl-trust-item b { display: block; font-family: 'Source Serif 4', Georgia, serif; font-weight: 600;
                        font-size: 1.2rem; color: var(--cl-ink, #1A1A1A); margin-bottom: 4px; }
